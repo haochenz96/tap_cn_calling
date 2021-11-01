@@ -1,0 +1,13 @@
+niter: 1000000
+nrestarts: 1
+fd: 0.1
+ad: 0.3
+cc: 0
+fp: 0.1
+fn: 0.3
+kmax: 1
+
+samples:
+    - primary
+    - liver_met
+    - E1
