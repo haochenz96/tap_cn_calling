@@ -1,0 +1,12 @@
+
+samples:
+    - primary
+    - liver_met
+    - E1
+    - organoid
+
+loom:
+    primary: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22/tapestri/RA17_22_P1_IGO_11988_B_2/11988_B_2.RA17_22_P1.cells.loom'
+    liver_met: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22/tapestri/RA17_22_39_13_liver_met/fresh/RA17_22_P2_IGO_11988_C_3.cells.loom'
+    E1: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22/tapestri/RA17_22_39_2_IGO_11988_E_1/RA17_22_39_2_IGO_11988_E_1.cells.loom'
+    organoid: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/organoid/pipeline/notebooks/IR125_P8_IGO_11988_C_4.cells.loom'
