@@ -78,7 +78,7 @@ def get_condensed_vaf_matrix(ds, df_pos, amplicon_list,
     
     return vaf_mat, read_depth_mat, alt_mat, cum_pos_indices.flatten(), cum_cell_indices
 
-def write_output_files(dest_prefix, vaf_mat, read_depth_mat, pos_indices, cell_indices,
+def write_output_files(dest_prefix, vaf_mat, read_depth_mat, pos_indices, cell_indices, df_selected_pos,
                        mutation_presence_threshold=0.2, homozygous_mutation_threshold=0.8):
     snv_mat = np.zeros(vaf_mat.shape)
     snv_mat[vaf_mat < mutation_presence_threshold] = 0
@@ -88,11 +88,15 @@ def write_output_files(dest_prefix, vaf_mat, read_depth_mat, pos_indices, cell_i
     snv_mat = snv_mat.astype(int)
     
     np.savetxt(f"{dest_prefix}_scite_snv_mat.txt", snv_mat, delimiter=" ", fmt='%d')
+    np.savetxt(f"{dest_prefix}_sifit_snv_mat.txt", np.hstack((np.arange(snv_mat.shape[0])[:,None], snv_mat)), delimiter=" ", fmt='%d')
 #     df_pos.set_index('index').loc[pos_indices].reset_index().drop(['ref_len', 'alt_len', 'normal'], axis=1).to_csv(f'{dest_prefix}_pos_indices.csv', sep=',', index=False)
     
     snv_mat_str = snv_mat.astype(str)
     snv_mat_str = np.char.replace(snv_mat_str, '3', '?').T
-    snv_mat_phiscs = np.vstack((np.hstack((np.array([['cell_idx/mut_idx']]), pos_indices[None, :].astype(str))), np.hstack((cell_indices[:,None], snv_mat_str))))
+    snv_mat_str = np.char.replace(snv_mat_str, '2', '1')
+    
+#     snv_mat_phiscs = np.vstack((np.hstack((np.array([['cell_idx/mut_idx']]), pos_indices[None, :].astype(str))), np.hstack((cell_indices[:,None], snv_mat_str))))
+    snv_mat_phiscs = np.vstack((np.hstack((np.array([['cell_idx/mut_idx']]), df_selected_pos['gene'].values[None, :].astype('str'))), np.hstack((cell_indices[:,None], snv_mat_str))))
     np.savetxt(f"{dest_prefix}_phiscs_snv_mat.txt", snv_mat_phiscs, delimiter="\t", fmt='%s')
     
 #     return snv_mat
@@ -117,6 +121,10 @@ def main(args):
     
     amplicon_list = list(df_pos.groupby(['pos', 'amplicon']).last().reset_index()['amplicon'].unique())
     
+    df_gene = pd.read_csv('/n/fs/ragr-research/projects/starch/STARCH/hgTables_hg19.txt', sep='\t', index_col=0)
+
+    df_gene = df_gene[df_gene['chrom'].apply(len) <= 5]
+    
     # construct the VAF and read depth matrices
     vaf_mat, read_depth_mat, alt_mat, pos_indices, cell_indices = get_condensed_vaf_matrix(ds, df_pos, amplicon_list, 
                                                                                            read_depth_threshold = args.depth,
@@ -124,16 +132,33 @@ def main(args):
                                                                                            presence_threshold = args.presence,
                                                                                            amplicon_threshold= args.amplicon)
     
-    
     # construct and write dataframes
     df_selected_pos = df_pos.set_index('index').loc[pos_indices].reset_index().drop(['ref_len', 'alt_len', 'normal'], axis=1)
+    
+    gene_list = []
+    for idx, row in df_selected_pos.iterrows():
+        pos = row['pos']
+        chrom = row['chrom']
+
+        df_select = df_gene[(df_gene['chrom'] == ''.join(['chr', str(chrom)])) & (df_gene['cdsStart'] <= pos) & (df_gene['cdsEnd'] >= pos)]
+        if len(df_select) == 0:
+            gene_list.append(row['index'])
+        else:
+            gene = list(df_select['name2'])[0]
+            if gene in gene_list:
+                gene_list.append('_'.join([gene, str(len([x for x in gene_list if str(x).startswith(gene)]))]))
+            else:
+                gene_list.append(gene)
+
+    df_selected_pos['gene'] = gene_list    
+    
     df_selected_pos.to_csv(f'{args.prefix}_pos_indices.csv', index=False)
     pd.concat([df_selected_pos, pd.DataFrame(vaf_mat, columns=cell_indices)], axis=1).to_csv(f'{args.prefix}_vaf.csv', index=False)
     pd.concat([df_selected_pos, pd.DataFrame(alt_mat, columns=cell_indices)], axis=1).to_csv(f'{args.prefix}_alt.csv', index=False)
     pd.concat([df_selected_pos, pd.DataFrame(read_depth_mat, columns=cell_indices)], axis=1).to_csv(f'{args.prefix}_total.csv', index=False)    
     
     # write the output files
-    write_output_files(args.prefix, vaf_mat, read_depth_mat, pos_indices, cell_indices,
+    write_output_files(args.prefix, vaf_mat, read_depth_mat, pos_indices, cell_indices, df_selected_pos,
                        mutation_presence_threshold = args.hetero, homozygous_mutation_threshold = args.homo)
     
     # disconnect
