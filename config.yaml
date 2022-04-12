@@ -1,12 +1,48 @@
 
 samples:
-    - primary
+    - primary1
+    - primary2
     - liver_met
-    - E1
-    - organoid
+    - lung_met
+    - retroperitor_met
+    - peritoneum_met
+    #- primary
+    #- liver_met
+    #- E1
+      #- organoid
 
 loom:
-    primary: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22/tapestri/RA17_22_P1_IGO_11988_B_2/11988_B_2.RA17_22_P1.cells.loom'
-    liver_met: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22/tapestri/RA17_22_39_13_liver_met/fresh/RA17_22_P2_IGO_11988_C_3.cells.loom'
-    E1: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22/tapestri/RA17_22_39_2_IGO_11988_E_1/RA17_22_39_2_IGO_11988_E_1.cells.loom'
-    organoid: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/organoid/pipeline/notebooks/IR125_P8_IGO_11988_C_4.cells.loom'
+    #primary: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22/tapestri/RA17_22_P1_IGO_11988_B_2/11988_B_2.RA17_22_P1.cells.loom'
+    #liver_met: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22/tapestri/RA17_22_39_13_liver_met/fresh/RA17_22_P2_IGO_11988_C_3.cells.loom'
+    #E1: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22/tapestri/RA17_22_39_2_IGO_11988_E_1/RA17_22_39_2_IGO_11988_E_1.cells.loom'
+    #organoid: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/organoid/pipeline/notebooks/IR125_P8_IGO_11988_C_4.cells.loom'
+    primary1: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/transfer/RA17_22_panel2/pipeline_results_default/RA17_22/RA17_22_32_1_IGO_12742_B_2/results/RA17_22_32_1_IGO_12742_B_2.cells.loom'
+    primary2: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/transfer/RA17_22_panel2/pipeline_results_default/RA17_22/RA17_22_35_1_IGO_12742_2/results/RA17_22_35_1_IGO_12742_2.cells.loom'
+    liver_met: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/transfer/RA17_22_panel2/pipeline_results_default/RA17_22/RA17_22_39_6_IGO_12742_1/results/RA17_22_39_6_IGO_12742_1.cells.loom'
+    lung_met: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/transfer/RA17_22_panel2/pipeline_results_default/RA17_22/RA17_22_06_2_IGO_12742_C_2/results/RA17_22_06_2_IGO_12742_C_2.cells.loom'
+    retroperitor_met: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/transfer/RA17_22_panel2/pipeline_results_default/RA17_22/RA17_22_42_2_IGO_12742_C_1/results/RA17_22_42_2_IGO_12742_C_1.cells.loom'
+    peritoneum_met: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/transfer/RA17_22_panel2/pipeline_results_default/RA17_22/RA17_22_27_2_IGO_12742_B_1/results/RA17_22_27_2_IGO_12742_B_1.cells.loom'
+
+paramSetList:
+    #- 'set1'
+    #- 'set2'
+    #- 'set3'
+    - 'set4'
+
+read_depth_threshold:
+    set1: 10
+    set2: 10
+    set3: 10
+    set4: 20
+
+vaf_threshold:
+    set1: 0.1
+    set2: 0.2
+    set3: 0.2
+    set4: 0.2
+
+presence_threshold:
+    set1: 0.1
+    set2: 0.2
+    set3: 0.1
+    set4: 0.1
