@@ -1,0 +1,31 @@
+nrestarts: 10
+seeds: 0
+max_nclones: 6
+max_cn: 5
+
+samples:
+    - primary1
+    - primary2
+    - liver
+    - lung
+    - retroperitoneum
+    - peritoneum
+    - diaphragm
+    - primary3
+
+genes:
+    - ARID1A
+    - BRCA2
+    - BMPR1A
+
+tsv_file_dict:
+    primary1: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22_panel2/old_pipeline/RA17_22_32_1_IGO_12742_B_2/results/tsv/RA17_22_32_1_IGO_12742_B_2.tube1.barcode.cell.distribution.tsv'
+    primary2: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22_panel2/old_pipeline/RA17_22_35_1_IGO_12742_2/results/tsv/RA17_22_35_1_IGO_12742_2.tube1.barcode.cell.distribution.tsv'
+    liver: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22_panel2/old_pipeline/RA17_22_39_6_IGO_12742_1/results/tsv/RA17_22_39_6_IGO_12742_1.tube1.barcode.cell.distribution.tsv'
+    lung: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22_panel2/old_pipeline/RA17_22_06_2_IGO_12742_C_2/results/tsv/RA17_22_06_2_IGO_12742_C_2.tube1.barcode.cell.distribution.tsv'
+    retroperitoneum: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22_panel2/old_pipeline/RA17_22_42_2_IGO_12742_C_1/results/tsv/RA17_22_42_2_IGO_12742_C_1.tube1.barcode.cell.distribution.tsv'
+    peritoneum: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22_panel2/old_pipeline/RA17_22_27_2_IGO_12742_B_1/results/tsv/RA17_22_27_2_IGO_12742_B_1.tube1.barcode.cell.distribution.tsv'
+    diaphragm: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22_panel2/old_pipeline/RA17_22-11_1/RA17_22_11_1_IGO_12742_D_2.barcode.cell.distribution.merged.tsv'
+    primary3: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22_panel2/old_pipeline/RA17_22_33_2/RA17_22_33_2_IGO_12742_D_1.barcode.cell.distribution.merged.tsv'
+
+amplicon_parameters: '/n/fs/ragr-data/users/palash/mskcc-analysis/panel2_normal_read_counts/panel2_nb_results.csv'
