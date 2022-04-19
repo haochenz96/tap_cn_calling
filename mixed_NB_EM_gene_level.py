@@ -157,7 +157,7 @@ def main(args):
     seed_list = np.random.permutation(np.arange(100))[:nrestarts]
     for restart_idx in range(nrestarts):
         inferred_mixing_props, inferred_cn, df_EM = mixed_NB_EM_fixed_dispersion_gene_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts,
-                                                                                            nclones=nclones, seed=seed_list[restart_idx])
+                                                                                            nclones=nclones, seed=seed_list[restart_idx], cn_max = args.maxcn)
         
         curr_max_marginal = df_EM.iloc[-1]['marginal']
         
@@ -197,6 +197,7 @@ if __name__ == "__main__":
     parser.add_argument('--nclones', type=int, help='number of clones', default=1)
     parser.add_argument('--nrestarts', type=int, help='number of restarts', default=1)
     parser.add_argument('--seed', type=int, help='seed', default=0)
+    parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)
         
     parser.add_argument('--prefix', type=str, help='prefix for output files')
 
