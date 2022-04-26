@@ -9,12 +9,14 @@ import statsmodels.api as sm
 from statsmodels.base.model import GenericLikelihoodModel
 
 from scipy.stats import nbinom
+from scipy.special import logsumexp
 
 def get_responsibilities_and_marginal_gene_level(df_observed_read_counts, df_gene_amplicons, cell_total_reads, mixing_props, cn):    
     ncells = len(df_observed_read_counts)
     nclones = len(cn)
 
-    coeffs = np.zeros((ncells, nclones))    
+    logcoeffs = np.zeros((ncells, nclones))
+    # coeffs = np.zeros((ncells, nclones))    
     
     for clone_idx in range(nclones):
         mu = cn[clone_idx] * cell_total_reads.values[:, np.newaxis] * df_gene_amplicons['amplicon_factor'].values[np.newaxis, :]
@@ -23,10 +25,13 @@ def get_responsibilities_and_marginal_gene_level(df_observed_read_counts, df_gen
         prob = phi_matrix / (phi_matrix + mu)
         coeff_ij = nbinom.pmf(df_observed_read_counts.values, phi_matrix, prob)
 
-        coeffs[:, clone_idx] =  mixing_props[clone_idx] * np.prod(coeff_ij, axis=1)    
+        logcoeffs[:, clone_idx] =  np.log(mixing_props[clone_idx]) + np.sum(np.log(coeff_ij), axis=1)        
+        # coeffs[:, clone_idx] =  mixing_props[clone_idx] * np.prod(coeff_ij, axis=1)    
         
-    marginal = np.sum(np.log(np.sum(coeffs, axis = 1)))
-    responsibilities = coeffs / np.sum(coeffs, axis = 1)[:, np.newaxis]        
+    marginal = np.sum(logsumexp(logcoeffs, axis=1))    
+    responsibilities = np.exp(logcoeffs - logsumexp(logcoeffs, axis=1)[:, np.newaxis])        
+    # marginal = np.sum(np.log(np.sum(coeffs, axis = 1)))
+    # responsibilities = coeffs / np.sum(coeffs, axis = 1)[:, np.newaxis]        
     
     return responsibilities, marginal
 
