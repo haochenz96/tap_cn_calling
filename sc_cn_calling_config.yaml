@@ -2,6 +2,8 @@ nrestarts: 10
 
 seeds: 0
 
+maxcn: 8
+
 nclones:
     - 1
     - 2
@@ -23,6 +25,33 @@ genes:
     - ARID1A
     - BRCA2
     - BMPR1A
+    - ACVR2A
+    - BMPR1B
+    - TGFBR2
+    - SMAD4
+    - BMPR2
+    - RNF43
+    - ATM
+    - SMAD2
+    - KMT2C
+    - ACVR1B
+    - ARID1B
+    - SMAD3
+    - TGFBR1
+    - KMT2D
+    - KAT5
+    - MYC
+    - BAP1
+    - TP53
+    - GATA6
+    - ARID2
+    - BRCA1
+    - CREBBP
+    - KRAS
+    - CDKN2A
+    - MTOR
+    - FGFR1
+    - ARHGAP35
 
 tsv_file_dict:
     primary1: '/n/fs/ragr-data/datasets/mskcc_iacobuzio/RA17_22_panel2/old_pipeline/RA17_22_32_1_IGO_12742_B_2/results/tsv/RA17_22_32_1_IGO_12742_B_2.tube1.barcode.cell.distribution.tsv'

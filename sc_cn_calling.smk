@@ -18,7 +18,8 @@ rule NB_EM:
         prefix='sc_cn_calling/{sample}_{gene}_{nclones}_{seed}',
         amplicon_df=config['amplicon_parameters'],
         nrestarts=config['nrestarts'],
+        maxcn=config['maxcn'],
     shell:
         'python mixed_NB_EM_gene_level.py --sample {wildcards.sample} --readcounts {input.tsv_file} --amplicon {params.amplicon_df} --gene {wildcards.gene} '
-        ' --nclones {wildcards.nclones} --nrestarts {params.nrestarts} --seed {wildcards.seed} --prefix {params.prefix} ' 
+        ' --nclones {wildcards.nclones} --nrestarts {params.nrestarts} --seed {wildcards.seed} --prefix {params.prefix} --maxcn {params.maxcn} ' 
         ' 1> {log.std} 2> {log.err}'
