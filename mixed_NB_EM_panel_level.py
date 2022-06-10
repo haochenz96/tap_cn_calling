@@ -97,8 +97,6 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
     # initial guess
     mixing_props = [1/nclones]*nclones
     cn_profiles = np.random.randint(cn_max - 1, size=(nclones, ngenes)) + 1
-
-    print(cn_profiles)
     
     relative_marginal_gain = np.inf
     old_marginal = np.inf
@@ -111,6 +109,8 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         # E-step
         responsibilities, new_marginal = get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist,
                                                                                        mixing_props, cn_profiles)
+        
+        print(cn_profiles)
         
         print(new_marginal, mixing_props)
         
@@ -142,21 +142,23 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
     
     return mixing_props, cn_profiles, df_EM
 
+
 def main(args):
     
     np.random.seed(args.seed)
     
     # prepare the input data
     df_tsv = pd.read_csv(args.readcounts, sep='\t', index_col = 0)
-    df_nb_residual = pd.read_csv(args.amplicon, index_col = 0)
-    df_nb_residual['phi'] = 1 / df_nb_residual['alpha']
-    curr_gene = args.gene
+    df_selected_amplicons = pd.read_csv(args.amplicon, index_col = 0)
+    df_selected_amplicons['phi'] = 1 / df_selected_amplicons['alpha']
     nclones = args.nclones
     
-    curr_selected_amplicons = list(df_nb_residual[df_nb_residual['gene'] == curr_gene].index)
+    genelist = list(df_selected_amplicons['gene'].unique())
+    ngenes = len(genelist)
+    
+    curr_selected_amplicons = list(df_selected_amplicons.index)
     df_observed_read_counts = df_tsv[curr_selected_amplicons]
     cell_total_read_counts = df_tsv.sum(axis = 1)
-    df_selected_amplicons = df_nb_residual.loc[curr_selected_amplicons][['amplicon_factor', 'phi']]    
     
     # multiple restarts of EM
     nrestarts = args.nrestarts
@@ -164,19 +166,20 @@ def main(args):
     
     seed_list = np.random.permutation(np.arange(100))[:nrestarts]
     for restart_idx in range(nrestarts):
-        inferred_mixing_props, inferred_cn, df_EM = mixed_NB_EM_fixed_dispersion_gene_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts,
-                                                                                            nclones=nclones, seed=seed_list[restart_idx], cn_max = args.maxcn)
+        inferred_mixing_props, inferred_cn_profiles, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts,
+                                                                                                      genelist, nclones=nclones, cn_max = args.maxcn,
+                                                                                                      seed=seed_list[restart_idx])
         
         curr_max_marginal = df_EM.iloc[-1]['marginal']
         
         if curr_max_marginal > max_marginal:
             final_df_EM = df_EM
             final_mixing_props = inferred_mixing_props
-            final_cn = inferred_cn
+            final_cn_profiles = inferred_cn_profiles
             max_marginal = curr_max_marginal
         
     # compute bic and aic
-    nparams = 2 * nclones
+    nparams = nclones + nclones * ngenes
     nsamples = np.prod(df_observed_read_counts.values.shape)
     bic = nparams * np.log(nsamples) - 2 * max_marginal
     aic = 2 * nparams - 2 * max_marginal
@@ -185,23 +188,32 @@ def main(args):
     prefix = args.prefix
     sample = args.sample
     
-    df_result = pd.DataFrame([[sample, curr_gene, nclones, args.seed, max_marginal, bic, aic]],
-                             columns = ['sample', 'gene', 'nclones', 'seed', 'marginal', 'BIC', 'AIC'])
+    df_result = pd.DataFrame([[sample, nclones, args.seed, max_marginal, bic, aic]],
+                             columns = ['sample', 'nclones', 'seed', 'marginal', 'BIC', 'AIC'])
     df_result.to_csv(f'{prefix}_result.csv', index=False)
     
-    df_clone_info = pd.DataFrame({'clone_id': list(np.arange(nclones)),
-                                  'cn': list(final_cn),
-                                  'props': list(final_mixing_props)})
-    df_clone_info.to_csv(f'{prefix}_clone_info.csv', index=False)
+    with open(f'{prefix}_clone_info.csv', 'w') as out:
+        out.write('clone_idx,gene,cn,prop\n')
+        for clone_idx in range(nclones):
+            for gene_idx, gene in enumerate(genelist):
+                out.write(f'{clone_idx},{gene},{final_cn_profiles[clone_idx][gene_idx]},{final_mixing_props[clone_idx]}\n')
+    
+    # df_clone_info = pd.DataFrame({'clone_id': list(np.arange(nclones)),
+    #                               'cn': list(final_cn),
+    #                               'props': list(final_mixing_props)})
+    # df_clone_info.to_csv(f'{prefix}_clone_info.csv', index=False)
     
     final_df_EM.to_csv(f'{prefix}_EM_info.csv', index=False)
+    
+    with open(f'{prefix}_genelist.txt', 'w') as out:
+        for gene in genelist:
+            out.write(f'{gene}\n')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--sample', type=str, help='sample name')
     parser.add_argument('--readcounts', type=str, help='read count file')
     parser.add_argument('--amplicon', type=str, help='amplicon dataframe')
-    parser.add_argument('--gene', type=str, help='gene of interest')
     parser.add_argument('--nclones', type=int, help='number of clones', default=1)
     parser.add_argument('--nrestarts', type=int, help='number of restarts', default=1)
     parser.add_argument('--seed', type=int, help='seed', default=0)
