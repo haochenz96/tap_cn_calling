@@ -2,7 +2,12 @@ nrestarts: 10
 
 seeds: 0
 
+panel_nseeds: 100
+panel_maxcn: 8
+
 maxcn: 8
+
+panel_amplicon_parameters: '/n/fs/ragr-data/users/palash/mskcc-analysis/panel2_normal_read_counts/selected_panel2_nb_results.csv'
 
 nclones:
     - 1
@@ -10,6 +15,8 @@ nclones:
     - 3
     - 4
     - 5
+    - 6
+    - 7
 
 samples:
     - primary1
