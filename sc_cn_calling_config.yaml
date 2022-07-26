@@ -10,7 +10,6 @@ maxcn: 8
 panel_amplicon_parameters: '/n/fs/ragr-data/users/palash/mskcc-analysis/panel2_normal_read_counts/selected_panel2_nb_results.csv'
 
 nclones:
-    - 1
     - 2
     - 3
     - 4

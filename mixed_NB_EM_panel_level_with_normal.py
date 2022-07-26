@@ -218,7 +218,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--sample', type=str, help='sample name')
     parser.add_argument('--readcounts', type=str, help='read count file')
-    parser.add_argument('--amplicon', type=str, help='amplicon dataframe')
+    parser.add_argument('--amplicon', type=str, help='amplicon dataframe containing pre-trained amplicon factors')
     parser.add_argument('--nclones', type=int, help='number of clones', default=1)
     parser.add_argument('--nrestarts', type=int, help='number of restarts', default=1)
     parser.add_argument('--seed', type=int, help='seed', default=0)
