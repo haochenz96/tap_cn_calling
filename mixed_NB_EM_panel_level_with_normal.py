@@ -97,12 +97,16 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
     ngenes = len(genelist)
     
     # initial guess
+    # initialize the CN profiles with a diploid clone and N-1 random ploidy clones
+    # initialize the mixing proportions with uniform probability
     mixing_props = [1/nclones]*nclones
     cn_profiles = np.random.randint(cn_max - 1, size=(nclones - 1, ngenes)) + 1
-    cn_profiles = np.vstack([cn_profiles, np.ones((1, ngenes))*2])
-    
+    cn_profiles = np.vstack([cn_profiles, np.ones((1, ngenes))*2]) 
+    print('='*20)
+    print('----- initial guess -----')
     print(cn_profiles)
-    
+    print(' '*20)
+    print(' '*20)
     relative_marginal_gain = np.inf
     old_marginal = np.inf
     iter_count = 0
@@ -115,15 +119,20 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         responsibilities, new_marginal = get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist,
                                                                                        mixing_props, cn_profiles)
         
-        print(cn_profiles)
-        
-        print(new_marginal, mixing_props)
-        
         # M-step
         new_mixing_props = responsibilities.sum(axis=0) / ncells
 
         new_cn_profiles = get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, responsibilities, cn_max)
         
+        print('='*20)
+        print(f'----- iter_count = {iter_count} updated cn_profiles -----')
+        print(new_cn_profiles)
+        print('-'*5)
+        print(f'New marginal = {new_marginal}')
+        print(f'Mixing props = {new_mixing_props}')
+        print(' '*20)
+        print(' '*20)
+
         # print(np.sum(np.isnan(responsibilities)))
         # print(responsibilities.shape)
         

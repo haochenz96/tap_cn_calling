@@ -30,10 +30,10 @@ rule all:
         #expand('sc_cn_calling/{sample}_{gene}_{nclones}_{seed}_result.csv', sample=config['samples'], gene=config['genes'], nclones=config['nclones'], seed=config['seeds']),
         expand('sc_cn_calling_panel_level/{sample}/intermediate_results/{sample}_nclones={nclones}_seed={seed}_result.csv', sample=config['samples'], nclones=config['nclones'], seed=panel_seeds),
         # gather NB_EM results
-        expand('sc_cn_calling_panel_level/{sample}/solution/{sample}_nclones={nclones}_solution-cell_assignments.csv', sample=config['samples'], nclones=config['nclones']),
-        expand('sc_cn_calling_panel_level/{sample}/solution/{sample}_nclones={nclones}_solution-sc_amplicon_ploidy.csv', sample = config['samples'], nclones = config['nclones']),
+        expand('sc_cn_calling_panel_level/{sample}/solutions/{sample}_nclones={nclones}_solution-cell_assignments.csv', sample=config['samples'], nclones=config['nclones']),
+        expand('sc_cn_calling_panel_level/{sample}/solutions/{sample}_nclones={nclones}_solution-sc_amplicon_ploidy.csv', sample = config['samples'], nclones = config['nclones']),
         # add ploidy layer to H5
-        expand('sc_cn_calling_panel_level/{sample}/ploidy_added_H5/{sample}_m2_f.ploidy_added.h5', sample=config['samples']),
+        expand('sc_cn_calling_panel_level/{sample}/outputs/{sample}_m2_f.ploidy_added.h5', sample=config['samples']),
 
 
 rule cn_calling_gene_level:
@@ -102,13 +102,16 @@ rule gather_NB_EM_results:
     input:
         EM_result_files = expand('sc_cn_calling_panel_level/{{sample}}/intermediate_results/{{sample}}_nclones={{nclones}}_seed={seed}_result.csv', seed=panel_seeds),
     output:
-        optimal_solution = 'sc_cn_calling_panel_level/{sample}/solution/{sample}_nclones={nclones}_solution-cell_assignments.csv',
-        sc_amplicon_ploidy = 'sc_cn_calling_panel_level/{sample}/solution/{sample}_nclones={nclones}_solution-sc_amplicon_ploidy.csv',
+        solution_cell_assignments = 'sc_cn_calling_panel_level/{sample}/solutions/{sample}_nclones={nclones}_solution-cell_assignments.csv',
+        solution_EM_info = 'sc_cn_calling_panel_level/{sample}/solutions/{sample}_nclones={nclones}_solution-EM_info.csv',
+        solution_clone_info = 'sc_cn_calling_panel_level/{sample}/solutions/{sample}_nclones={nclones}_solution-clone_info.csv',
+        sc_amplicon_ploidy = 'sc_cn_calling_panel_level/{sample}/solutions/{sample}_nclones={nclones}_solution-sc_amplicon_ploidy.csv',
+
     params:
         input_rc_tsv_file = lambda wildcards: config['tsv_file_dict'][wildcards.sample],
         python_script = config['scripts']['gather_NB_EM_results'],
         intermediate_results_dir = 'sc_cn_calling_panel_level/{sample}/intermediate_results',
-        prefix = 'sc_cn_calling_panel_level/{sample}/solution/{sample}_nclones={nclones}',
+        prefix = 'sc_cn_calling_panel_level/{sample}/solutions/{sample}_nclones={nclones}',
         amplicon_parameters_f = config['panel_amplicon_parameters'],
     log:
         std = 'sc_cn_calling_panel_level/{sample}/std/gather_NB_EM_results-{sample}_nclones={nclones}.log',
@@ -135,10 +138,12 @@ rule add_ploidy_layers_to_h5:
     # scatter by sample
     input:
         # gather for each nclones
-        sc_amplicon_ploidy_all_nclones = expand('sc_cn_calling_panel_level/{{sample}}/solution/{{sample}}_nclones={nclones}_solution-sc_amplicon_ploidy.csv', nclones=config['nclones']),
+        sc_amplicon_ploidy_all_nclones = expand('sc_cn_calling_panel_level/{{sample}}/solutions/{{sample}}_nclones={nclones}_solution-sc_amplicon_ploidy.csv', nclones=config['nclones']),
+        EM_results_all_nclones = expand('sc_cn_calling_panel_level/{{sample}}/solutions/{{sample}}_nclones={nclones}_solution-cell_assignments.csv', nclones=config['nclones']),
         input_H5 = lambda wildcards: config['input_H5'][wildcards.sample],
     output:
-        H5_ploidy_added = 'sc_cn_calling_panel_level/{sample}/ploidy_added_H5/{sample}_m2_f.ploidy_added.h5',
+        H5_ploidy_added = 'sc_cn_calling_panel_level/{sample}/outputs/{sample}_m2_f.ploidy_added.h5',
+        EM_summary = 'sc_cn_calling_panel_level/{sample}/outputs/{sample}.NB_EM_summary.csv',
     params:
         python_script = config['scripts']['add_ploidy_layers_to_h5'],
     conda: 

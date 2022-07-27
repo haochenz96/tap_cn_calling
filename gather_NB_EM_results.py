@@ -86,12 +86,18 @@ def main(args):
     print(f'[INFO] best solution: seed = {seed}, nclones = {nclones}')
 
     # copy over the best solution
-    shutil.copyfile(EM_results_fs[best_idx], f'{output_prefix}_solution-seed={seed}_EM_info.csv')
+    shutil.copyfile(
+        EM_results_fs[best_idx], 
+        f'{output_prefix}_solution-EM_info.csv'
+        )
     solution_clone_info_f = (inputs_dir / f'{sample_name}_nclones={nclones}_seed={seed}_clone_info.csv')
     if not solution_clone_info_f.is_file():
         print('[ERROR} clone info file not found')
     else:
-        shutil.copyfile(f'{inputs_dir}/{sample_name}_nclones={nclones}_seed={seed}_clone_info.csv', f'{output_prefix}_solution-seed={seed}_clone_info.csv')
+        shutil.copyfile(
+            f'{inputs_dir}/{sample_name}_nclones={nclones}_seed={seed}_clone_info.csv', 
+            f'{output_prefix}_solution-clone_info.csv'
+            )
     
     # ----- get sc-amplicon ploidy with best solution
     # << prepare inputs >>
