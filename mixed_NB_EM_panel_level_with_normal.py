@@ -162,8 +162,40 @@ def main(args):
     np.random.seed(args.seed)
     
     # prepare the input data
-    df_tsv = pd.read_csv(args.readcounts, sep='\t', index_col = 0)
-    df_selected_amplicons = pd.read_csv(args.amplicon, index_col = 0)
+    cn_calling_mode = args.cn_calling_mode
+    if cn_calling_mode not in ['single-sample', 'cohort']:
+        print('Error: cn_calling_mode must be either single-sample or cohort')
+        exit(1)
+    elif cn_calling_mode == 'single-sample':
+        sample_name = args.sample_name
+        if type(sample_name) != str:
+            raise ValueError('for single-sample mode, sample_name must be a string')
+            exit(1)
+
+        df_tsv = pd.read_csv(args.readcounts, sep='\t', index_col = 0)
+    else:
+        sample_names = args.sample_name
+        cohort_name = args.cohort_name
+        print(sample_names)
+        print(len(args.readcounts))
+        if type(sample_names) != list:
+            raise ValueError('for cohort mode, sample_names must be a list')
+            exit(1)
+        elif len(sample_names) != len(args.readcounts):
+            raise ValueError('for cohort mode, sample_names must be a list mapping one-to-one to readcount matricies')
+            exit(1)
+
+        df_tsv = pd.concat(
+            [pd.read_csv(f, sep='\t', index_col = 0) for f in args.readcounts], 
+            keys = sample_names,
+            )
+        
+    df_selected_amplicons = pd.read_csv(args.amplicon_parameters_f, index_col = 0)
+    num_total_amplicons = df_selected_amplicons.shape[0]
+    df_selected_amplicons = df_selected_amplicons.loc[df_selected_amplicons['converged'] == True] # filter out unconverged amplicons
+    num_converge_amplicons = df_selected_amplicons.shape[0]
+    print(f'[INFO] using {num_converge_amplicons}/{num_total_amplicons} converged amplicons'
+    )
     df_selected_amplicons['phi'] = 1 / df_selected_amplicons['alpha']
     nclones = args.nclones
     
@@ -200,10 +232,13 @@ def main(args):
     
     # write the output
     prefix = args.prefix
-    sample = args.sample
-    
-    df_result = pd.DataFrame([[sample, nclones, args.seed, max_marginal, bic, aic]],
+    # sample = args.sample
+    if cn_calling_mode == 'single-sample':
+        df_result = pd.DataFrame([[sample_name, nclones, args.seed, max_marginal, bic, aic]],
                              columns = ['sample', 'nclones', 'seed', 'marginal', 'BIC', 'AIC'])
+    else:
+        df_result = pd.DataFrame([[cohort_name, nclones, args.seed, max_marginal, bic, aic]],
+                             columns = ['cohort', 'nclones', 'seed', 'marginal', 'BIC', 'AIC'])
     df_result.to_csv(f'{prefix}_result.csv', index=False)
     
     with open(f'{prefix}_clone_info.csv', 'w') as out:
@@ -225,14 +260,21 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--sample', type=str, help='sample name')
-    parser.add_argument('--readcounts', type=str, help='read count file')
-    parser.add_argument('--amplicon', type=str, help='amplicon dataframe containing pre-trained amplicon factors')
+    parser.add_argument('--cn_calling_mode', type=str, choices= ['single-sample', 'cohort'], help='whether to do NB_EM on each sample, or a cohort')
+    parser.add_argument('--sample_name', nargs="*", help='sample name; if cohort-level run, this needs to be a list of sample names, matching the order of tsvs.')
+    parser.add_argument('--cohort_name', type=str, help='cohort name', default='')
+    parser.add_argument('--readcounts', nargs="*", help='read count file(s); if cohort-level run, this should be a list of rc files for all samples in cohort.')
+    # parser.add_argument('--amplicon', type=str, help='amplicon dataframe containing pre-trained amplicon factors')
     parser.add_argument('--nclones', type=int, help='number of clones', default=1)
+    parser.add_argument('--amplicon_parameters_f', type=str, help='''
+    amplicon parameters dataframe containing the following necessary columns: 
+        - amplicon_ID (AMPL41099') in the first column to be used as index;
+        - 'gene', the corresponding gene's Hugo_Symbol for each amplicon;
+        - 'amplicon_factor' & 'alpha' & 'beta_zero' & 'beta_one' & 'method' & 'mean' & 'variance' trained NB parameters specific for each amplicon.
+    ''')
     parser.add_argument('--nrestarts', type=int, help='number of restarts', default=1)
     parser.add_argument('--seed', type=int, help='seed', default=0)
-    parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)
-        
+    parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)     
     parser.add_argument('--prefix', type=str, help='prefix for output files')
 
     args = parser.parse_args(None if sys.argv[1:] else ['-h'])

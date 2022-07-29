@@ -47,12 +47,39 @@ def main(args):
 
     # ----- prepare inputs ----- 
     # <<< inputs >>> 
-    sample_name = args.sample_name
-    df_tsv = pd.read_csv(args.readcounts, sep='\t', index_col = 0)
-    num_unique_amplicons = len(df_tsv.index)
+    # prepare the input data
+    cn_calling_mode = args.cn_calling_mode
+    if cn_calling_mode not in ['single-sample', 'cohort']:
+        print('Error: cn_calling_mode must be either single-sample or cohort')
+        exit(1)
+    elif cn_calling_mode == 'single-sample':
+        sample_name = args.sample_name
+        if type(sample_name) != str:
+            raise ValueError('for single-sample mode, sample_name must be a string')
+            exit(1)
+
+        df_tsv = pd.read_csv(args.readcounts, sep='\t', index_col = 0)
+    else:
+        sample_name = args.cohort_name
+        sample_names = args.sample_name
+        # print(sample_names)
+        # print(len(args.readcounts))
+        if type(sample_names) != list:
+            raise ValueError('for cohort mode, sample_names must be a list')
+            exit(1)
+        elif len(sample_names) != len(args.readcounts):
+            raise ValueError('for cohort mode, sample_names must be a list mapping one-to-one to readcount matricies')
+            exit(1)
+
+        df_tsv = pd.concat(
+            [pd.read_csv(f, sep='\t', index_col = 0) for f in args.readcounts], 
+            keys = sample_names,
+            )
+    num_unique_amplicons = len(df_tsv.columns)
     df_cell_total_read_counts = df_tsv.sum(axis = 1)
 
     df_selected_amplicons = pd.read_csv(args.amplicon_parameters_f, index_col = 0)
+    df_selected_amplicons = df_selected_amplicons.loc[df_selected_amplicons['converged'] == True] # filter out unconverged amplicons
     df_selected_amplicons['phi'] = 1 / df_selected_amplicons['alpha']
 
     nclones = args.nclones
@@ -75,14 +102,19 @@ def main(args):
         outputs_dir.mkdir(parents=True, exist_ok=True)
 
     # ----- summarize EM results -----
+    print(inputs_dir)
+    print(sample_name)
+    print(nclones)
+    print( str(inputs_dir / f'{sample_name}_nclones={nclones}_seed=*_result.csv'))
     EM_results_fs = glob.glob(str(inputs_dir / f'{sample_name}_nclones={nclones}_seed=*_result.csv')) # note we are restricting to a particular nclones
+    print(EM_results_fs)
     EM_results_dfs = [pd.read_csv(f) for f in EM_results_fs]
     EM_summary_df = pd.concat(EM_results_dfs, ignore_index=True)
 
     # identify the best solution from all seeds
     best_idx = EM_summary_df['BIC'].idxmin()
-    seed = EM_summary_df.iloc[best_idx]['seed']
-    nclones = EM_summary_df.iloc[best_idx]['nclones']
+    seed = int(EM_summary_df.iloc[best_idx]['seed'])
+    nclones = int(EM_summary_df.iloc[best_idx]['nclones'])
     print(f'[INFO] best solution: seed = {seed}, nclones = {nclones}')
 
     # copy over the best solution
@@ -138,9 +170,11 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--sample_name', type=str, help='sample name')
-    parser.add_argument('--nclones', type=int, help='number of clones')
-    parser.add_argument('--readcounts', type=str, help='read count file')
+    parser.add_argument('--cn_calling_mode', type=str, choices= ['single-sample', 'cohort'], help='whether to do NB_EM on each sample, or a cohort')
+    parser.add_argument('--sample_name', nargs="*", help='sample name; if cohort-level run, this needs to be a list of sample names, matching the order of tsvs.')
+    parser.add_argument('--cohort_name', type=str, help='cohort name', default='')
+    parser.add_argument('--readcounts', nargs="*", help='read count file(s); if cohort-level run, this should be a list of rc files for all samples in cohort.')
+    parser.add_argument('--nclones', type=int, help='number of clones', default=1)
     parser.add_argument('--amplicon_parameters_f', type=str, help='''
     amplicon parameters dataframe containing the following necessary columns: 
         - amplicon_ID (AMPL41099') in the first column to be used as index;
