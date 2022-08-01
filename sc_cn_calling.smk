@@ -63,8 +63,8 @@ rule cn_calling_panel_level:
     benchmark: 
         '{output_dir}/{sample}/benchmark/{sample}_nclones={nclones}_seed={seed}_benchmark.log'
     params:
-        cn_calling_mode = cn_calling_mode,
-        input_sample_name = lambda wildcards: wildcards.sample if cn_calling_mode == 'ss' else list(config['tsv_file_dict'].keys()),
+        cn_calling_mode = config['cn_calling_mode'],
+        input_sample_name = list(config['tsv_file_dict'].keys()) if cn_calling_mode == 'cohort' else lambda wildcards: wildcards.sample,
         prefix = '{output_dir}/{sample}/intermediate_results/{sample}_nclones={nclones}_seed={seed}',
         python_script = config['scripts']['cn_calling_panel_level'],
         amplicon_df = config['panel_amplicon_parameters'],
@@ -78,7 +78,7 @@ rule cn_calling_panel_level:
     resources:
         # mem_mb = lambda wildcards, attempt: attempt * 2000,
         mem_mb = 2000,
-        time_min = lambda wildcards, attempt: attempt * 179,
+        time_min = lambda wildcards, attempt: attempt * 119,
     shell:
         '''
         python {params.python_script} \
@@ -103,10 +103,10 @@ rule gather_NB_EM_results:
         solution_clone_info = '{output_dir}/{sample}/solutions/{sample}_nclones={nclones}_solution-clone_info.csv',
         sc_amplicon_ploidy = '{output_dir}/{sample}/solutions/{sample}_nclones={nclones}_solution-sc_amplicon_ploidy.csv',
     params:
-        cn_calling_mode = cn_calling_mode,
+        cn_calling_mode = config['cn_calling_mode'],
         input_cohort_name = lambda wildcards: wildcards.sample,
-        input_sample_name = lambda wildcards: wildcards.sample if cn_calling_mode == 'ss' else list(config['tsv_file_dict'].keys()),
-        input_rc_tsv_file = lambda wildcards: config['tsv_file_dict'][wildcards.sample] if cn_calling_mode == 'ss' else 
+        input_sample_name = list(config['tsv_file_dict'].keys()) if cn_calling_mode == 'cohort' else lambda wildcards: wildcards.sample,
+        input_rc_tsv_file = lambda wildcards: config['tsv_file_dict'][wildcards.sample] if cn_calling_mode == 'single-sample' else 
         [config['tsv_file_dict'][sample_i] for sample_i in config['samples']],
         python_script = config['scripts']['gather_NB_EM_results'],
         intermediate_results_dir = '{output_dir}/{sample}/intermediate_results',
@@ -151,7 +151,7 @@ rule add_ploidy_layers_to_h5:
         H5_ploidy_added = '{output_dir}/{sample}/outputs/{sample_i}_m2_f.ploidy_added.h5',
         EM_summary = '{output_dir}/{sample}/outputs/{sample_i}.NB_EM_summary.csv',
     params:
-        cn_calling_mode = cn_calling_mode,
+        cn_calling_mode = config['cn_calling_mode'],
         input_sample_name = lambda wildcards: wildcards.sample_i,
         python_script = config['scripts']['add_ploidy_layers_to_h5'],
     conda: 

@@ -8,7 +8,7 @@ import argparse
 import plotly.express as px
 import json
 
-# from IPython import embed
+from IPython import embed
 
 def main(args):
     cn_calling_mode = args.cn_calling_mode
@@ -86,8 +86,9 @@ def main(args):
                     )
                 
                 sc_amplicon_ploidy_df.index.names = ['sample', 'cell_barcode']
-                sc_amplicon_ploidf_df = sc_amplicon_ploidy_df.loc[sample_name] 
-
+                sc_amplicon_ploidy_df = sc_amplicon_ploidy_df.loc[sample_name] 
+                sc_amplicon_ploidy_df.index = sc_amplicon_ploidy_df.index.drop_duplicates()
+            embed()
             ploidy_layer = sc_amplicon_ploidy_df.reindex(
                         index = sample.cnv.barcodes(),
                         columns = sample.cnv.ids()

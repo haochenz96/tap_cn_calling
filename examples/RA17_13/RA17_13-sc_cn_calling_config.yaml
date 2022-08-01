@@ -1,0 +1,59 @@
+top_dir: /home/zhangh5/work/Tapestri_batch2/analysis/cn_clones
+cohort_name: RA17_13
+
+####################
+# not applicable for panel level
+nrestarts: 10
+seeds: 0
+maxcn: 10
+####################
+
+cn_calling_mode: cohort # cohort or single-sample
+panel_nseeds: 10
+panel_maxcn: 20
+panel_amplicon_parameters: /home/zhangh5/work/Tapestri_batch2/analysis/cn_clones/train-normal_samples/train-combined_8_normals/NB_train-combined_8_normals-results.gene_added.csv
+
+# Number of clones to try. These will be executed in parallel.
+nclones:
+    - 2
+    # - 3
+    # - 4
+    # - 5
+    # - 6
+    # - 7
+    # - 8
+    # - 9
+    # - 10
+
+samples:
+    - RA17_13-34_1
+    - RA17_13-44_1
+    - RA17_13-50_1
+    - RA17_13-55_1
+    - RA17_13-56_1
+    - RA17_13-67_1
+    # - RA17_13-73_6
+
+tsv_file_dict:
+    RA17_13-34_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-34_1/OUTPUTS_from_m2_f/RA17_13-34_1.per_amplicon_read_counts.tsv
+    RA17_13-44_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-44_1/OUTPUTS_from_m2_f/RA17_13-44_1.per_amplicon_read_counts.tsv
+    RA17_13-50_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-50_1/OUTPUTS_from_m2_f/RA17_13-50_1.per_amplicon_read_counts.tsv
+    RA17_13-55_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-55_1/OUTPUTS_from_m2_f/RA17_13-55_1.per_amplicon_read_counts.tsv
+    RA17_13-56_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-56_1/OUTPUTS_from_m2_f/RA17_13-56_1.per_amplicon_read_counts.tsv
+    RA17_13-67_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-67_1/OUTPUTS_from_m2_f/RA17_13-67_1.per_amplicon_read_counts.tsv
+
+input_H5:
+    RA17_13-34_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-34_1/OUTPUTS_from_m2_f/RA17_13-34_1_DNA_CNV_m2_f.bulk_annotated.ponv1_filtered.h5
+    RA17_13-44_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-44_1/OUTPUTS_from_m2_f/RA17_13-44_1_DNA_CNV_m2_f.bulk_annotated.ponv1_filtered.h5
+    RA17_13-50_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-50_1/OUTPUTS_from_m2_f/RA17_13-50_1_DNA_CNV_m2_f.bulk_annotated.ponv1_filtered.h5
+    RA17_13-55_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-55_1/OUTPUTS_from_m2_f/RA17_13-55_1_DNA_CNV_m2_f.bulk_annotated.ponv1_filtered.h5
+    RA17_13-56_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-56_1/OUTPUTS_from_m2_f/RA17_13-56_1_DNA_CNV_m2_f.bulk_annotated.ponv1_filtered.h5
+    RA17_13-67_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA17_13/RA17_13-67_1/OUTPUTS_from_m2_f/RA17_13-67_1_DNA_CNV_m2_f.bulk_annotated.ponv1_filtered.h5
+
+# Deprecated???
+amplicon_parameters: /home/zhangh5/work/Tapestri_batch2/analysis/cn_clones/reference/panel2_nb_results-TP53_fixed.csv
+
+scripts:
+    cn_calling_panel_level: /home/zhangh5/work/Tapestri_project/cn-calling/mixed_NB_EM_panel_level_with_normal.py
+    gather_NB_EM_results: /home/zhangh5/work/Tapestri_project/cn-calling/gather_NB_EM_results.py 
+    add_ploidy_layers_to_h5: /home/zhangh5/work/Tapestri_project/cn-calling/add_ploidy_layers_to_h5.py
