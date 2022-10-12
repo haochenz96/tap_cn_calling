@@ -1,3 +1,5 @@
+from cgi import print_arguments
+from pprint import pprint
 import numpy as np
 import pandas as pd
 import math
@@ -11,12 +13,38 @@ from statsmodels.base.model import GenericLikelihoodModel
 from scipy.stats import nbinom
 from scipy.special import logsumexp
 
-def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, mixing_props, cn_profiles):    
+def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, mixing_props, cn_profiles):
+    '''
+    E-step: get responsibilities of each cluster for each cell, assuming all other parameters are known. Also get marginal which is the total mixing props of each cluster in the population.
+
+    Parameters
+    ----------
+    df_observed_read_counts : pandas.DataFrame
+        Observed read counts for each amplicon in each cell.
+    df_amplicons : pandas.DataFrame
+        Amplicon information.
+    cell_total_reads : pandas.Series
+        Total read counts for each cell.
+    genelist : list
+        List of genes.
+    mixing_props : numpy.array
+        Known mixing proportions for each cluster.
+    cn_profiles : numpy.array
+        Known copy number profiles for each cluster.
+
+
+    Returns:
+    --------
+    responsibilities: ncells x nclones
+        Responsibilities of each cluster for each cell.
+
+    marginal: nclones x 1
+        Marginal proportion of each cluster in the population.
+    '''
     ncells = len(df_observed_read_counts)
     nclones = cn_profiles.shape[0]
     ngenes = cn_profiles.shape[1]
     namplicons = len(df_amplicons)
-    
     expanded_cn_profile = np.zeros((nclones, namplicons))
     for amplicon_idx, amplicon in enumerate(df_observed_read_counts):
         curr_gene = df_amplicons.loc[amplicon]['gene']
@@ -29,19 +57,22 @@ def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_am
     for clone_idx in range(nclones):
         mu = expanded_cn_profile[clone_idx, :] * cell_total_reads.values[:, np.newaxis] * df_amplicons['amplicon_factor'].values[np.newaxis, :]
         phi_matrix = np.array([1]*ncells)[:, np.newaxis] * df_amplicons['phi'].values[np.newaxis, :]
-
         prob = phi_matrix / (phi_matrix + mu)
+        
         coeff_ij = nbinom.pmf(df_observed_read_counts.values, phi_matrix, prob)
-        
-        logcoeffs[:, clone_idx] =  np.log(mixing_props[clone_idx]) + np.sum(np.log(coeff_ij), axis=1)        
+        coeff_ij = np.where(coeff_ij == 0, 1e-300, coeff_ij) # @HZ: replace 0 with a small number
+        logcoeffs[:, clone_idx] =  np.log(mixing_props[clone_idx]) + np.sum(np.log(coeff_ij), axis=1)
         # coeffs[:, clone_idx] =  mixing_props[clone_idx] * np.prod(coeff_ij, axis=1)    
-        
-    marginal = np.sum(logsumexp(logcoeffs, axis=1))    
+
+    marginal = np.sum(logsumexp(logcoeffs, axis=1))  
     responsibilities = np.exp(logcoeffs - logsumexp(logcoeffs, axis=1)[:, np.newaxis])
     
     return responsibilities, marginal
 
 def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, responsibilities, maxcn = 8):
+    '''
+    M-step: given known responsibilities, calculate the optimal copy number profile for each cluster.
+    '''
     ncells = len(df_observed_read_counts)
     nclones = responsibilities.shape[1]
     ngenes = len(genelist)
@@ -50,6 +81,7 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
     cn_profile = np.zeros((nclones, ngenes))
     
     for gene_idx, gene in enumerate(genelist):
+        # iterate over each gene
         curr_amplicons = list(df_amplicons[df_amplicons['gene'] == gene].index)
         df_gene_observed_read_counts = df_observed_read_counts[curr_amplicons]
         df_gene_amplicons = df_amplicons[df_amplicons['gene'] == gene]
@@ -57,10 +89,14 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
         for clone_idx in range(nclones - 1):
             max_coeff = -np.inf
             for cn in range(maxcn + 1):
-                curr_coeff = evaluate_coeff(responsibilities[:, clone_idx],
-                                            df_gene_observed_read_counts,
-                                            df_gene_amplicons,
-                                            cell_total_reads, cn)
+                # try out all the integer copy number values
+                curr_coeff = _evaluate_coeff(
+                    responsibilities[:, clone_idx],
+                    df_gene_observed_read_counts,
+                    df_gene_amplicons,
+                    cell_total_reads, 
+                    cn
+                    )
                 
                 # print(curr_coeff, gene_idx, clone_idx, cn)
                 if curr_coeff > max_coeff:
@@ -73,7 +109,17 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
     
     return cn_profile
 
-def evaluate_coeff(responsibilities, df_gene_observed_read_counts, df_gene_amplicons, cell_total_reads, cn):
+def _evaluate_coeff(responsibilities, df_gene_observed_read_counts, df_gene_amplicons, cell_total_reads, cn):
+    '''
+    M-step helper function: given known responsibilities, and a particular integer cn value, calculate the parameters for each negative binomial distribution.
+
+    Parameters
+
+    Returns:
+    --------
+    coeff: float
+        The coefficient for the given cn value.
+    '''
     ll = 0
     ncells = len(df_gene_observed_read_counts)
     
@@ -116,8 +162,9 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
     # while (iter_count < maxiter):
         
         # E-step
-        responsibilities, new_marginal = get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist,
-                                                                                       mixing_props, cn_profiles)
+        responsibilities, new_marginal = get_responsibilities_and_marginal_panel_level(
+            df_observed_read_counts, df_amplicons, cell_total_reads, genelist, mixing_props, cn_profiles
+            )
         
         # M-step
         new_mixing_props = responsibilities.sum(axis=0) / ncells
@@ -158,7 +205,9 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
 
 
 def main(args):
-    
+    '''
+    Main execution function
+    '''
     np.random.seed(args.seed)
     
     # prepare the input data
@@ -173,7 +222,7 @@ def main(args):
             exit(1)
 
         df_tsv = pd.read_csv(args.readcounts, sep='\t', index_col = 0)
-    else:
+    else: # cn_calling_mode == ‘cohort’
         sample_names = args.sample_name
         cohort_name = args.cohort_name
         print(sample_names)
