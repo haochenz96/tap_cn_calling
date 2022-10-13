@@ -9,7 +9,7 @@ maxcn: 10
 ####################
 
 cn_calling_mode: cohort # cohort or single-sample
-panel_nseeds: 10
+panel_nseeds: 100
 panel_maxcn: 20
 panel_amplicon_parameters: /home/zhangh5/work/Tapestri_batch2/analysis/cn_clones/train-normal_samples/train-combined_8_normals/NB_train-combined_8_normals-results.gene_added.csv
 
