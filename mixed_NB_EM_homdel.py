@@ -256,7 +256,7 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         
     df_EM = pd.DataFrame(em_data, columns = ['iterations', 'old_marginal', 'marginal', 'relative_marginal_gain'])
     
-    return mixing_props, cn_profiles, df_EM
+    return mixing_props, cn_profiles, pi, df_EM
 
 
 def main(args):
@@ -316,7 +316,7 @@ def main(args):
     
     seed_list = np.random.permutation(np.arange(100))[:nrestarts]
     for restart_idx in range(nrestarts):
-        inferred_mixing_props, inferred_cn_profiles, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts,
+        inferred_mixing_props, inferred_cn_profiles, inferred_pi, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts,
                                                                                                       genelist, nclones=nclones, cn_max = args.maxcn,
                                                                                                       seed=seed_list[restart_idx])
         
@@ -326,10 +326,12 @@ def main(args):
             final_df_EM = df_EM
             final_mixing_props = inferred_mixing_props
             final_cn_profiles = inferred_cn_profiles
+            final_pi = inferred_pi
             max_marginal = curr_max_marginal
         
     # compute bic and aic
-    nparams = nclones + (nclones - 1) * ngenes
+    # nparams = nclones + (nclones - 1) * ngenes 
+    nparams = nclones + (nclones - 1) * ngenes * 2 # @HZ: this is doubled because of pi
     nsamples = np.prod(df_observed_read_counts.values.shape)
     bic = nparams * np.log(nsamples) - 2 * max_marginal
     aic = 2 * nparams - 2 * max_marginal
@@ -350,6 +352,9 @@ def main(args):
         for clone_idx in range(nclones):
             for gene_idx, gene in enumerate(genelist):
                 out.write(f'{clone_idx},{gene},{final_cn_profiles[clone_idx][gene_idx]},{final_mixing_props[clone_idx]}\n')
+    inferred_pi.to_csv(
+        f"{prefix}_pi.csv",
+    )
     
     # df_clone_info = pd.DataFrame({'clone_id': list(np.arange(nclones)),
     #                               'cn': list(final_cn),
