@@ -87,21 +87,32 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
         df_gene_amplicons = df_amplicons[df_amplicons['gene'] == gene]
         
         for clone_idx in range(nclones - 1):
-            max_coeff = -np.inf
-            for cn in range(maxcn + 1):
-                # try out all the integer copy number values
-                curr_coeff = _evaluate_coeff(
+            cn_nb_lls = pd.Series(range(1, maxcn + 1)).apply(
+                lambda cn_i: _evaluate_coeff(
                     responsibilities[:, clone_idx],
                     df_gene_observed_read_counts,
                     df_gene_amplicons,
                     cell_total_reads, 
-                    cn
+                    cn_i,
                     )
+                ) # 1 x maxcn
+            cn_profile[clone_idx, gene_idx] = np.argmax(cn_nb_lls) + 1
+
+            # max_coeff = -np.inf
+            # for cn in range(maxcn + 1):
+            #     # try out all the integer copy number values
+            #     curr_coeff = _evaluate_coeff(
+            #         responsibilities[:, clone_idx],
+            #         df_gene_observed_read_counts,
+            #         df_gene_amplicons,
+            #         cell_total_reads, 
+            #         cn
+            #         )
                 
-                # print(curr_coeff, gene_idx, clone_idx, cn)
-                if curr_coeff > max_coeff:
-                    max_coeff = curr_coeff
-                    cn_profile[clone_idx, gene_idx] = cn
+            #     # print(curr_coeff, gene_idx, clone_idx, cn)
+            #     if curr_coeff > max_coeff:
+            #         max_coeff = curr_coeff
+            #         cn_profile[clone_idx, gene_idx] = cn
             
             # print('updated', gene_idx, clone_idx, cn_profile[clone_idx, gene_idx])
 
@@ -165,6 +176,7 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         responsibilities, new_marginal = get_responsibilities_and_marginal_panel_level(
             df_observed_read_counts, df_amplicons, cell_total_reads, genelist, mixing_props, cn_profiles
             )
+        print(f'number of unique clusters: {len(np.unique(responsibilities.argmax(axis=1)))}')
         
         # M-step
         new_mixing_props = responsibilities.sum(axis=0) / ncells
