@@ -1,14 +1,7 @@
-from cgi import print_arguments
-from pprint import pprint
 import numpy as np
 import pandas as pd
-import math
 import argparse
 import sys
-
-import statsmodels
-import statsmodels.api as sm
-from statsmodels.base.model import GenericLikelihoodModel
 
 from scipy.stats import nbinom
 from scipy.special import logsumexp
@@ -95,7 +88,7 @@ def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_am
     # np.exp(logcoeffs - logsumexp(logcoeffs, axis=1)[:, np.newaxis])  
     responsibilities = np.exp(logcoeffs - logsumexp(logcoeffs, axis=0))
     responsibilities = responsibilities.T
-    print(np.sum(responsibilities, axis=0))
+    # print(np.sum(responsibilities, axis=0))
     
     return responsibilities, marginal
 
@@ -236,7 +229,12 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
 
         # print(np.sum(np.isnan(responsibilities)))
         # print(responsibilities.shape)
-        
+
+        # homdel
+        print('-'*20)
+        print(f'number of homdel amplicons: {(new_pi == 0).any(axis=0).sum()}')  
+        print(f'the amplicons are: {new_pi.columns[(new_pi == 0).any(axis=0)]}')
+        print('='*20)
         if iter_count > 0:
             relative_marginal_gain = (new_marginal - old_marginal) / np.abs(old_marginal)
             
@@ -352,7 +350,7 @@ def main(args):
         for clone_idx in range(nclones):
             for gene_idx, gene in enumerate(genelist):
                 out.write(f'{clone_idx},{gene},{final_cn_profiles[clone_idx][gene_idx]},{final_mixing_props[clone_idx]}\n')
-    inferred_pi.to_csv(
+    final_pi.to_csv(
         f"{prefix}_pi.csv",
     )
     
