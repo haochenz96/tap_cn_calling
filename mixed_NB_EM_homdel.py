@@ -193,7 +193,8 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
             index = range(nclones), 
             columns = df_observed_read_counts.columns
             )
-    homdel_params = (1e-10, 0.01)
+    # homdel_params = (1e-10, 0.01) @HZ: strict
+    homdel_params = (1, 0.4) # @HZ: loose
     print('='*20)
     print('----- initial guess -----')
     print(cn_profiles)
