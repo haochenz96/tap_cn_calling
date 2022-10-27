@@ -13,8 +13,6 @@ from statsmodels.base.model import GenericLikelihoodModel
 from scipy.stats import nbinom
 from scipy.special import logsumexp
 
-from IPython import embed
-
 def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicon_params, cell_total_reads, genelist, mixing_props, cn_profiles_df, pi, homdel_params):
     '''
     E-step: get responsibilities of each cluster for each cell, assuming all other parameters are known. Also get marginal which is the total mixing props of each cluster in the population.
