@@ -129,16 +129,17 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
                 prob = phi_matrix / (phi_matrix + mu)
                 psi = nbinom.logpmf(df_gene_observed_read_counts.values, phi_matrix, prob)
                 amplicon_nb_lls = np.sum(psi, axis = 0)
-                # print(f"amplicon_nb_lls: {amplicon_nb_lls}")
-                # print(f"amplicon_nb_lls shape: {amplicon_nb_lls.shape}")
-                # 1 x M (namplicons selected): likelihood of the NB distribution with cn = 1
-                # print(df_gene_observed_read_counts)
                 psi0 = nbinom.logpmf(df_gene_observed_read_counts.values, n0, p0)
                 amplicon_homdel_lls = np.sum(psi0, axis = 0)
                 # 1 x M (namplicons selected): likelihood of amplicon being homdel
                 homdel_amps = np.array(curr_amplicons)[
                         np.where(amplicon_homdel_lls > amplicon_nb_lls)[0]
                         ]
+                # if gene == 'STK11':
+                #     print('*****STK11 homdel')
+                #     print(amplicon_nb_lls)
+                #     print(amplicon_homdel_lls)
+                #     print(homdel_amps)
                 pi.loc[clone_idx, homdel_amps] = 0
 
     cn_profile[-1,:] = 2
@@ -191,6 +192,7 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
             index = range(nclones), 
             columns = df_observed_read_counts.columns
             )
+    # SET HOMDEL_PARAMS
     # homdel_params = (1e-10, 0.01) @HZ: strict
     homdel_params = (1, 0.4) # @HZ: loose
     print('='*20)
