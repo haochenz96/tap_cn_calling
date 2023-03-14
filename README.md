@@ -71,7 +71,9 @@ Importantly, the `best_nclones` parameter needs to be determined from phase1's B
     
     {cohort_name}-homdel-nclones={best_nclones}_start_from_best_sol_solution.cell_assignments.csv'
     ```
-    `outputs/` contains a lineplot of BIC across different `nclones` and symlink to the solution with the best `nclones`.
+    `outputs/` contains:
+    - a plot of each CN clone's per-amplicon ploidy state.
+    - a plot of each sample's CN clone composition.
 
 ## Run Parameters
 
