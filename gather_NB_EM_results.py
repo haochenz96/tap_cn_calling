@@ -158,7 +158,10 @@ def main(args):
         index = df_observed_read_counts.index, 
         columns = df_observed_read_counts.columns
         )
-    # embed()
+    df_amp_clone_profiles = pd.DataFrame(
+        index = df_wide_solution_clone_info.index.get_level_values(0),
+        columns = df_observed_read_counts.columns,
+    )
     for amplicon_idx, amplicon in enumerate(df_observed_read_counts):
         curr_gene = df_selected_amplicons.loc[amplicon]['gene']
         gene_idx = genelist.index(curr_gene)
@@ -166,7 +169,14 @@ def main(args):
             df_cell_assignments['clone_id'].values, 
             gene_idx
             ]
+
+        df_amp_clone_profiles.iloc[:, amplicon_idx] = array_solution_clone_cn_profiles[
+            df_amp_clone_profiles.index.get_level_values(0), 
+            gene_idx
+            ]
+
     df_sc_amplicon_ploidy.to_csv(f'{output_prefix}_solution-sc_amplicon_ploidy.csv', index=True, header=True)
+    df_amp_clone_profiles.to_csv(f'{output_prefix}_solution-amp_clone_profiles.csv', index=True, header=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

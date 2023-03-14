@@ -203,17 +203,20 @@ def main(args):
             f'{output_prefix}_solution-pi.csv'
             )
     
-    # ----- get sc-amplicon ploidy with best solution
+    # ----- get sc-amplicon ploidy with best solution -----
+    # ----- get clone profiles with best solution -----
     # << prepare inputs >>
     df_solution_clone_info = pd.read_csv(solution_clone_info_f)
     df_solution_pi = pd.read_csv(solution_pi, index_col = 0)
+
     # -- the clone_profiles numpy array need to be clone_idx by gene_idx; and the genes need to be in the same order as the genelist
-    df_wide_solution_clone_info = df_solution_clone_info.pivot(index=['clone_idx','prop'], columns='gene', values='cn').reset_index()
+    df_wide_solution_clone_info = df_solution_clone_info.pivot(index=['clone_idx','prop'], columns='gene', values='cn')
     array_solution_clone_cn_profiles = df_wide_solution_clone_info.loc[:, genelist].values
+
     # -- the clone_props needs to be a dict mapping from clone_idx to clone_prop
-    dict_clone_props = df_wide_solution_clone_info.loc[:, ['clone_idx', 'prop']].set_index('clone_idx')['prop'].to_dict()
+    dict_clone_props = df_wide_solution_clone_info.reset_index().loc[:, ['clone_idx', 'prop']].set_index('clone_idx')['prop'].to_dict()
     
-    # get responsibilities
+    # __get responsibilities
     # def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicon_params, cell_total_reads, genelist, mixing_props, cn_profiles_df, pi, homdel_params):
     responsibilities, _ = get_responsibilities_and_marginal_panel_level(
         df_observed_read_counts, 
@@ -230,12 +233,17 @@ def main(args):
     df_cell_assignments = pd.DataFrame(cell_assignments, index = df_cell_total_read_counts.index, columns = ['clone_id'])
     df_cell_assignments.to_csv(f'{output_prefix}_solution-cell_assignments.csv', index=True, header=True)
 
-    # final output: single-cell x amplicon 
+    # OUTPUT: single-cell x amplicon 
     df_sc_amplicon_ploidy = pd.DataFrame(
         index = df_observed_read_counts.index, 
         columns = df_observed_read_counts.columns
         )
     # embed()
+        # OUTPUT: clone_id x amplicon_id
+    df_amp_clone_profiles = pd.DataFrame(
+        index = df_wide_solution_clone_info.index.get_level_values(0),
+        columns = df_observed_read_counts.columns,
+    )
     for amplicon_idx, amplicon in enumerate(df_observed_read_counts):
         curr_gene = df_selected_amplicons.loc[amplicon]['gene']
         gene_idx = genelist.index(curr_gene)
@@ -243,7 +251,14 @@ def main(args):
             df_cell_assignments['clone_id'].values, 
             gene_idx
             ] * df_solution_pi.loc[df_cell_assignments['clone_id'].values, amplicon].values # homdel
+
+        df_amp_clone_profiles.iloc[:, amplicon_idx] = array_solution_clone_cn_profiles[
+            df_amp_clone_profiles.index.get_level_values(0), 
+            gene_idx
+            ] * df_solution_pi.loc[df_amp_clone_profiles.index.get_level_values(0), amplicon].values
+
     df_sc_amplicon_ploidy.to_csv(f'{output_prefix}_solution-sc_amplicon_ploidy.csv', index=True, header=True)
+    df_amp_clone_profiles.to_csv(f'{output_prefix}_solution-amp_clone_profiles.csv', index=True, header=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

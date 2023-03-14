@@ -7,6 +7,7 @@ configfile: "sc_cn_calling_config.yaml"
 # ----- specify directories -----
 top_dir = Path(config['top_dir'])
 cohort_name = config['cohort_name']
+run_suffix = config['run_suffix']
 working_dir = top_dir / cohort_name
 print(f'[INFO] --- working directory ---- {working_dir}')
 workdir: working_dir
@@ -20,14 +21,14 @@ try:
         raise ValueError(f'cn_calling_mode must be either single-sample or cohort , not {config["cn_calling_mode"]}')
     if config['cn_calling_mode'] == 'single-sample':
         cn_calling_mode = 'ss'
-        output_dir = f'{cn_calling_mode}-cn_calling'
+        output_dir = f'{cn_calling_mode}-cn_calling-{run_suffix}'
         samples = config['samples']
         TARGET_ploidy_added_h5s = [
             f'{output_dir}/{sample_i}/outputs/{sample_i}_m2_f.ploidy_added.h5' for sample_i in samples
             ]
     else:
         cn_calling_mode = 'cohort'
-        output_dir = f'{cn_calling_mode}-cn_calling'
+        output_dir = f'{cn_calling_mode}-cn_calling-{run_suffix}'
         samples = cohort_name
         TARGET_ploidy_added_h5s = [
             f'{output_dir}/{cohort_name}/outputs/{sample_i}_m2_f.ploidy_added.h5' for sample_i in config['samples']
@@ -56,12 +57,10 @@ rule all:
         # #expand('sc_cn_calling/{sample}_{gene}_{nclones}_{seed}_result.csv', sample=config['samples'], gene=config['genes'], nclones=config['nclones'], seed=config['seeds']),
         # expand('{output_dir}/{sample}/intermediate_results/{sample}_nclones={nclones}_seed={seed}_result.csv', sample=samples, nclones=config['nclones'], seed=panel_seeds, output_dir = output_dir),
         # # # gather NB_EM results
-        # expand('{output_dir}/{sample}/solutions/{sample}_nclones={nclones}_solution-cell_assignments.csv', sample=samples, nclones=config['nclones'], output_dir = output_dir),
+        expand('{output_dir}/{sample}/solutions/{sample}_nclones={nclones}_solution-cell_assignments.csv', sample=samples, nclones=config['nclones'], output_dir = output_dir),
         # expand('{output_dir}/{sample}/solutions/{sample}_nclones={nclones}_solution-sc_amplicon_ploidy.csv', sample = samples, nclones = config['nclones'], output_dir = output_dir),
         # add ploidy layer to H5
-        # # @HZ TODO: this final H5 output needs to vary depending on the mode of cn_calling
-        # expand('{output_dir}/{sample}/outputs/{sample_i}_m2_f.ploidy_added.h5', zip, sample=samples, sample_i=config['samples'], output_dir = output_dir),
-        TARGET_ploidy_added_h5s,
+        # TARGET_ploidy_added_h5s,
 
 rule cn_calling_panel_level:
 # scatter by sample (if in ss mode), nclones, seed
@@ -85,11 +84,12 @@ rule cn_calling_panel_level:
         err = '{output_dir}/{sample}/intermediate_results/std/{sample}_nclones={nclones}_seed={seed}.err.log',
     conda: 
         "envs/sc_cn_calling.yaml",
-    threads: 4
+    threads: lambda wildcards, attempt: attempt * 4
     resources:
         # mem_mb = lambda wildcards, attempt: attempt * 2000,
         mem_mb = 2000,
         time_min = lambda wildcards, attempt: attempt * 179,
+    retries: 3
     shell:
         '''
         python {params.python_script} \

@@ -193,8 +193,11 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
             columns = df_observed_read_counts.columns
             )
     # SET HOMDEL_PARAMS
-    # homdel_params = (1e-10, 0.01) @HZ: strict
-    homdel_params = (1, 0.4) # @HZ: loose
+    homdel_params = (1e-10, 0.01) # @HZ: strict
+    print('='*20)
+    print('Inferring copy numbers with homdels considered.')
+    print('--> homdel_params: ', homdel_params)
+    # homdel_params = (1e-5, 0.99) # @HZ: loose
     print('='*20)
     print('----- initial guess -----')
     print(cn_profiles)
