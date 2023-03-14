@@ -6,7 +6,7 @@ import sys
 from scipy.stats import nbinom
 from scipy.special import logsumexp
 
-from IPython import embed
+# from IPython import embed
 
 # @HZ: 01-23-2023:
 # PS homdel method
@@ -89,7 +89,7 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
     # amplicon_to_index_dict = {amplicon_list[idx]: idx for idx in range(namplicons)}
 
     cn_profile = np.zeros((nclones, ngenes))
-    homdel_profile = np.zeros((nclones, namplicons))
+    homdel_profiles = pd.DataFrame(np.ones((nclones, namplicons)), index = range(nclones), columns = df_observed_read_counts.columns)
     
     for gene_idx, gene in enumerate(genelist):
         
@@ -122,7 +122,7 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
             # sys.exit(1)
             best_cn = np.argmax(cn_nb_lls_plus_per_amplicon_homdel_mask.apply(lambda row_i: row_i[0])) + 1
             cn_profile[clone_idx, gene_idx] = best_cn
-            homdel_profile.loc[clone_idx, df_gene_amplicons.index] = cn_nb_lls_plus_per_amplicon_homdel_mask.iloc[best_cn-1][1]
+            homdel_profiles.loc[clone_idx, df_gene_amplicons.index] = cn_nb_lls_plus_per_amplicon_homdel_mask.iloc[best_cn-1][1]
 
             # max_coeff = -np.inf
             # for cn in range(maxcn + 1):
@@ -143,8 +143,9 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
             # print('updated', gene_idx, clone_idx, cn_profile[clone_idx, gene_idx])
 
     cn_profile[-1,:] = 2
+    homdel_profiles.iloc[-1, :] = 0
     
-    return cn_profile
+    return cn_profile, homdel_profiles
 
 def _evaluate_coeff(responsibilities, df_gene_observed_read_counts, df_gene_amplicons, cell_total_reads, cn, homdel_coeffs):
     '''
@@ -181,7 +182,7 @@ def _evaluate_coeff(responsibilities, df_gene_observed_read_counts, df_gene_ampl
 
     return total_coeff, per_amplicon_homdel_mask    
 
-def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, nclones=1, cn_max=8, maxiter=20, seed=0, tol = 1e-6, predefined_cn_clone_profiles = None, predefined_cn_clone_props = None, init_guess_maxcn = None):
+def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, nclones=1, cn_max=8, maxiter=20, seed=0, tol = 1e-6, predefined_cn_clone_info = None, predefined_cn_clone_props = None, init_guess_maxcn = None):
     '''
     EM algorithm for mixed negative binomial model with fixed dispersion.
 
@@ -190,7 +191,7 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
     df_observed_read_counts: pd.DataFrame
 
     ...
-    predefined_cn_clone_profiles: np.array
+    predefined_cn_clone_info: np.array
         A predefined cn profile for each clone. If not None, the algorithm will use this as the initial guess.
     predefined_cn_clone_props: list
         A predefined mixing proportion for each clone. If not None, the algorithm will use this as the initial guess.
@@ -214,8 +215,8 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         pass
 
     # #FOR HOMDEL pre-defined initial guess
-    if predefined_cn_clone_profiles is not None:
-        cn_profiles = predefined_cn_clone_profiles
+    if predefined_cn_clone_info is not None:
+        cn_profiles = predefined_cn_clone_info
         # nclones = cn_profiles.shape[0]
         if predefined_cn_clone_props is not None:
             mixing_props = predefined_cn_clone_props
@@ -265,11 +266,16 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         # M-step
         new_mixing_props = responsibilities.sum(axis=0) / ncells
         
-        new_cn_profiles = get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, responsibilities, cn_max)
+        new_cn_profiles, homdel_profiles = get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, responsibilities, cn_max)
         
         print('='*20)
         print(f'----- iter_count = {iter_count} updated cn_profiles -----')
         print(new_cn_profiles)
+        print(f'----- homdel_profiles -----')
+        print(homdel_profiles)
+        print(f"[INFO] number of homdel amplicons: {(homdel_profiles==1).any(axis=0).sum()}")
+        print(f"[INFO] genes involved: {df_amplicons.loc[homdel_profiles.columns[(homdel_profiles==1).any(axis=0)]]['gene'].values}")
+        homdel_profiles = homdel_profiles.values # prepare for next iteration
         print('-'*5)
         print(f'New marginal = {new_marginal}')
         print(f'Mixing props = {new_mixing_props}')
@@ -297,7 +303,7 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         
     df_EM = pd.DataFrame(em_data, columns = ['iterations', 'old_marginal', 'marginal', 'relative_marginal_gain'])
     
-    return mixing_props, cn_profiles, df_EM
+    return mixing_props, cn_profiles, homdel_profiles, df_EM
 
 
 def main(args):
@@ -348,12 +354,12 @@ def main(args):
     ngenes = len(genelist)
     
     curr_selected_amplicons = list(df_selected_amplicons.index)
-    df_observed_read_counts = df_tsv[curr_selected_amplicons]
+    df_observed_read_counts = df_tsv[curr_selected_amplicons] # select to converged amplicons
     cell_total_read_counts = df_tsv.sum(axis = 1)
 
     # parse predefined cn profiles
-    if args.predefined_cn_clone_profiles is not None:
-        df_predefined_cn_profiles = pd.read_csv(args.predefined_cn_clone_profiles, header=0, index_col=None)
+    if args.predefined_cn_clone_info is not None:
+        df_predefined_cn_profiles = pd.read_csv(args.predefined_cn_clone_info, header=0, index_col=None)
         # -- the clone_profiles numpy array need to be clone_idx by gene_idx; and the genes need to be in the same order as the genelist
         df_wide_solution_clone_info = df_predefined_cn_profiles.pivot(index=['clone_idx','prop'], columns='gene', values='cn').reset_index()
         array_predefined_cn_profiles = df_wide_solution_clone_info.loc[:, genelist].values
@@ -371,7 +377,15 @@ def main(args):
     
     seed_list = np.random.permutation(np.arange(100))[:nrestarts]
     for restart_idx in range(nrestarts):
-        inferred_mixing_props, inferred_cn_profiles, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts, genelist, nclones=nclones, cn_max = args.maxcn, seed=seed_list[restart_idx], predefined_cn_clone_profiles=array_predefined_cn_profiles, predefined_cn_clone_props=array_clone_props, init_guess_maxcn=init_guess_maxcn)
+        inferred_mixing_props, inferred_cn_profiles, homdel_profiles,df_EM = mixed_NB_EM_fixed_dispersion_panel_level(
+            df_observed_read_counts, 
+            df_selected_amplicons, 
+            cell_total_read_counts, 
+            genelist, 
+            nclones=nclones, 
+            cn_max = args.maxcn, 
+            seed=seed_list[restart_idx], predefined_cn_clone_info=array_predefined_cn_profiles, predefined_cn_clone_props=array_clone_props, init_guess_maxcn=init_guess_maxcn
+            )
         
         curr_max_marginal = df_EM.iloc[-1]['marginal']
         
@@ -396,24 +410,22 @@ def main(args):
     else:
         df_result = pd.DataFrame([[cohort_name, nclones, args.seed, max_marginal, bic, aic]],
                              columns = ['cohort', 'nclones', 'seed', 'marginal', 'BIC', 'AIC'])
-    df_result.to_csv(f'{prefix}_result.csv', index=False)
+    df_result.to_csv(f'{prefix}.result.csv', index=False)
     
-    with open(f'{prefix}_clone_info.csv', 'w') as out:
+    with open(f'{prefix}.clone_info.csv', 'w') as out:
         out.write('clone_idx,gene,cn,prop\n')
         for clone_idx in range(nclones):
             for gene_idx, gene in enumerate(genelist):
                 out.write(f'{clone_idx},{gene},{final_cn_profiles[clone_idx][gene_idx]},{final_mixing_props[clone_idx]}\n')
     
-    # df_clone_info = pd.DataFrame({'clone_id': list(np.arange(nclones)),
-    #                               'cn': list(final_cn),
-    #                               'props': list(final_mixing_props)})
+    pd.DataFrame(homdel_profiles, index = range(nclones), columns=df_observed_read_counts.columns).to_csv(f'{prefix}.homdel_profiles.csv', index=True)
     # df_clone_info.to_csv(f'{prefix}_clone_info.csv', index=False)
     
-    final_df_EM.to_csv(f'{prefix}_EM_info.csv', index=False)
+    final_df_EM.to_csv(f'{prefix}.EM_info.csv', index=False)
     
-    with open(f'{prefix}_genelist.txt', 'w') as out:
-        for gene in genelist:
-            out.write(f'{gene}\n')
+    # with open(f'{prefix}_genelist.txt', 'w') as out:
+    #     for gene in genelist:
+    #         out.write(f'{gene}\n')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -432,7 +444,7 @@ if __name__ == "__main__":
     parser.add_argument('--nrestarts', type=int, help='number of restarts', default=1)
     parser.add_argument('--seed', type=int, help='seed', default=0)
     parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)   
-    parser.add_argument('--predefined_cn_clone_profiles', type=str, help='for homdel training, can start from previous optimal solution. This is the `{prefix}-clone_info.csv` file output by the NB-EM_CN_caller without homdel. Necessary columns are `clone_idx`,`prop`,`gene`, `cn`. Note that if the nclones from the previous solution is smaller than the currently defined nclones, random clones will be appended with uniform distribution.')
+    parser.add_argument('--predefined_cn_clone_info', type=str, help='for homdel training, can start from previous optimal solution. This is the `{prefix}-clone_info.csv` file output by the NB-EM_CN_caller without homdel. Necessary columns are `clone_idx`,`prop`,`gene`, `cn`. Note that if the nclones from the previous solution is smaller than the currently defined nclones, random clones will be appended with uniform distribution.')
     parser.add_argument('--init_guess_maxcn', type=int, help='limit the maximum possible copy number for the initial guess', default=3)
     parser.add_argument('--prefix', type=str, help='prefix for output files')
 

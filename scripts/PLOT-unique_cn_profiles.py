@@ -52,6 +52,7 @@ def main(args):
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    output_f_prefix = args.output_f_prefix
 
     # _____check input_____
     assert amp_gene_map_df.index.astype(str)[0].startswith('AMPL'), '[WARNING] amp_gene_map_df.index should start with "AMPL"'
@@ -98,7 +99,7 @@ def main(args):
     unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.reindex(columns = amp_gene_map_df.index, fill_value=-1)
     
     unique_cn_clone_profiles_df.to_csv(
-        output_dir / f'{cohort_name}_unique_cn_clone_profiles.csv',
+        output_dir / f'{cohort_name}{output_f_prefix}.unique_cn_clone_profiles.csv',
         index=True, header=True
     )
 
@@ -238,7 +239,7 @@ def main(args):
             )
 
     fig.write_image(
-        output_dir / f'{cohort_name}_cn_clone_profiles.png',
+        output_dir / f'{cohort_name}{output_f_prefix}.cn_clone_profiles.png',
         format='png',
         width=1600,
         height=400,
@@ -271,7 +272,7 @@ def main(args):
     )
 
     fig.write_image(
-        output_dir / f'{cohort_name}_sample_CN-cluster_composition.png',
+        output_dir / f'{cohort_name}{output_f_prefix}.sample_CN-cluster_composition.png',
         format='png',
         scale = 3,
     )
@@ -363,7 +364,7 @@ def main(args):
                     font_family = 'Arial',
                     font_size = 15,
                 ).write_image(
-                    output_dir / 'gene_rc_distributions' / f'{cohort_name}_{gene_i}_rc_boxplot.png',
+                    output_dir / 'gene_rc_distributions' / f'{cohort_name}{output_f_prefix}_{gene_i}.rc_boxplot.png',
                 )
             logging.info(f"[SUCCESS] finished plotting raw read count distributions for homdel amplicons in cohort {cohort_name}")
 
@@ -376,6 +377,7 @@ if __name__ == "__main__":
     parser.add_argument('--cn_clone_profiles_csv', type=str, help='amplicon-level CN clone profile', required=True)
     parser.add_argument('--sample_sc_clone_assignment_csv', type=str, help='df assigning each sample, each single cell to each CN cluster. Therefore the 3 columns, in order, must be `sample_name`, `single-cell ID`, `cluster_id`. Only the `cluster_id` column needs to be named.', required=True)
     parser.add_argument('--output_dir', type=str, help='output directory', required=True)
+    parser.add_argument('--output_f_prefix', type=str, help='output file prefix', default='')
     parser.add_argument('--plot_homdel', type=bool, help='for genes likely affected by homdel, plot distribution of all its amplicons', default=False)
     parser.add_argument('--homdel_genes_oi', type = str, nargs='+', help = 'genes of interest for plotting homdel amplicon distributions', default = None)
     parser.add_argument('--cn_call_yaml', type=str, help='Required when plotting raw rc distribution. YAML file for this cn-call run', default=None)

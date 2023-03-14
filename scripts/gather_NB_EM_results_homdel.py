@@ -14,90 +14,91 @@ from scipy.special import logsumexp
 import seaborn as sns
 import matplotlib.pyplot as plt
 # from IPython import embed
+from mixed_NB_EM_homdel_PS import get_responsibilities_and_marginal_panel_level
 
-def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicon_params, cell_total_reads, genelist, mixing_props, cn_profiles_df, pi, homdel_params):
-    '''
-    E-step: get responsibilities of each cluster for each cell, assuming all other parameters are known. Also get marginal which is the total mixing props of each cluster in the population.
+# def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicon_params, cell_total_reads, genelist, mixing_props, cn_profiles_df, homdel_profiles, homdel_params):
+#     '''
+#     E-step: get responsibilities of each cluster for each cell, assuming all other parameters are known. Also get marginal which is the total mixing props of each cluster in the population.
 
-    Parameters
-    ----------
-    df_observed_read_counts : pandas.DataFrame
-        ncells x namplicons
-        Observed read counts for each amplicon in each cell.
+#     Parameters
+#     ----------
+#     df_observed_read_counts : pandas.DataFrame
+#         ncells x namplicons
+#         Observed read counts for each amplicon in each cell.
 
-    df_amplicon_params : pandas.DataFrame
-        namplicons x nparams
-        Pretrained amplicon parameters.
+#     df_amplicon_params : pandas.DataFrame
+#         namplicons x nparams
+#         Pretrained amplicon parameters.
     
-    cell_total_reads : pandas.Series
-        Total read counts for each cell.
+#     cell_total_reads : pandas.Series
+#         Total read counts for each cell.
 
-    mixing_props : numpy.array
-        nclones x 1
-        Known mixing proportions for each cluster.
+#     mixing_props : numpy.array
+#         nclones x 1
+#         Known mixing proportions for each cluster.
 
-    cn_profiles_df : pandas.DataFrame
-        nclones x ngenes
-        Known copy number profiles for each cluster.
+#     cn_profiles_df : pandas.DataFrame
+#         nclones x ngenes
+#         Known copy number profiles for each cluster.
     
-    pi : pandas.DataFrame
-        nclones x namplicons
-        Known amplicon-specific dropout/homdel probabilities for each cluster.
+#     homdel_profiles : pandas.DataFrame
+#         nclones x namplicons
+#         Known amplicon-specific dropout/homdel probabilities for each cluster.
     
-    homdel_nb_params : Tuple
-        (n0, p0) for NB distribution of read counts for a homdel/dropout amplicon.
+#     homdel_nb_params : Tuple
+#         (n0, p0) for NB distribution of read counts for a homdel/dropout amplicon.
 
-    Returns:
-    --------
-    responsibilities: ncells x nclones
-        Responsibilities of each cluster for each cell.
+#     Returns:
+#     --------
+#     responsibilities: ncells x nclones
+#         Responsibilities of each cluster for each cell.
 
-    marginal: nclones x 1
-        Marginal proportion of each cluster in the population.
-    '''
-    ncells = len(df_observed_read_counts) # N
-    nclones = cn_profiles_df.shape[0] # K
-    namplicons = df_amplicon_params.shape[0] # M
-    # embed()
-    # convert:
-    # gene level read counts (K x ngenes) 
-    # to
-    # amplicon level read counts (K x M)
-    cn_profiles_df = pd.DataFrame(cn_profiles_df, index = range(nclones), columns = genelist)
-    expanded_cn_profile = pd.DataFrame(
-        index = range(nclones), 
-        columns = df_observed_read_counts.columns
-        )
-    # embed()
-    expanded_cn_profile = expanded_cn_profile.apply(
-        lambda x: cn_profiles_df[df_amplicon_params.loc[x.name, 'gene']],
-    )
+#     marginal: nclones x 1
+#         Marginal proportion of each cluster in the population.
+#     '''
+#     ncells = len(df_observed_read_counts) # N
+#     nclones = cn_profiles_df.shape[0] # K
+#     namplicons = df_amplicon_params.shape[0] # M
+#     # embed()
+#     # convert:
+#     # gene level read counts (K x ngenes) 
+#     # to
+#     # amplicon level read counts (K x M)
+#     cn_profiles_df = pd.DataFrame(cn_profiles_df, index = range(nclones), columns = genelist)
+#     expanded_cn_profile = pd.DataFrame(
+#         index = range(nclones), 
+#         columns = df_observed_read_counts.columns
+#         )
+#     # embed()
+#     expanded_cn_profile = expanded_cn_profile.apply(
+#         lambda x: cn_profiles_df[df_amplicon_params.loc[x.name, 'gene']],
+#     )
     
-    n0, p0 = homdel_params
+#     n0, p0 = homdel_params
 
-    # logcoeffs = np.zeros((ncells, nclones)) # N x K
+#     # logcoeffs = np.zeros((ncells, nclones)) # N x K
 
-    # --- calculate likelihood through matrix operation --- 
-    mu = (expanded_cn_profile.values.flatten() * cell_total_reads.values[:, np.newaxis]).reshape(ncells, nclones, namplicons).transpose(1, 0, 2) * df_amplicon_params['amplicon_factor'].values[np.newaxis, :] # [K x N x M]
+#     # --- calculate likelihood through matrix operation --- 
+#     mu = (expanded_cn_profile.values.flatten() * cell_total_reads.values[:, np.newaxis]).reshape(ncells, nclones, namplicons).transpose(1, 0, 2) * df_amplicon_params['amplicon_factor'].values[np.newaxis, :] # [K x N x M]
 
-    phi_matrix = np.array([1]*ncells)[:, np.newaxis] * df_amplicon_params['phi'].values[np.newaxis, :] # [N x M]
-    prob = phi_matrix / (phi_matrix + mu) # [K x N x M]
+#     phi_matrix = np.array([1]*ncells)[:, np.newaxis] * df_amplicon_params['phi'].values[np.newaxis, :] # [N x M]
+#     prob = phi_matrix / (phi_matrix + mu) # [K x N x M]
     
-    # coeff = pi * nb_likelihood + (1 - pi) * beta_likelihood
-    coeff_ijk = nbinom.pmf(df_observed_read_counts.values, phi_matrix, prob) * pi.values[:, None, :] + nbinom.pmf(df_observed_read_counts.values, n0, p0) * (1 - pi.values)[:, None, :] # this should guarantee that coeff_ijk is non-zero, but still replace just in case
+#     # coeff = homdel_profiles * nb_likelihood + (1 - homdel_profiles) * beta_likelihood
+#     coeff_ijk = nbinom.pmf(df_observed_read_counts.values, phi_matrix, prob) * homdel_profiles.values[:, None, :] + nbinom.pmf(df_observed_read_counts.values, n0, p0) * (1 - homdel_profiles.values)[:, None, :] # this should guarantee that coeff_ijk is non-zero, but still replace just in case
     
-    coeff_ijk = np.where(coeff_ijk == 0, 1e-300, coeff_ijk) # @HZ: replace 0 with a small number
+#     coeff_ijk = np.where(coeff_ijk == 0, 1e-300, coeff_ijk) # @HZ: replace 0 with a small number
 
-    logcoeffs = (np.log(mixing_props)[:, None] + np.sum(np.log(coeff_ijk), axis=2))
+#     logcoeffs = (np.log(mixing_props)[:, None] + np.sum(np.log(coeff_ijk), axis=2))
 
-    # embed()
-    marginal = np.sum(logsumexp(logcoeffs, axis=0))
-    # np.exp(logcoeffs - logsumexp(logcoeffs, axis=1)[:, np.newaxis])  
-    responsibilities = np.exp(logcoeffs - logsumexp(logcoeffs, axis=0))
-    responsibilities = responsibilities.T
-    print(np.sum(responsibilities, axis=0))
+#     # embed()
+#     marginal = np.sum(logsumexp(logcoeffs, axis=0))
+#     # np.exp(logcoeffs - logsumexp(logcoeffs, axis=1)[:, np.newaxis])  
+#     responsibilities = np.exp(logcoeffs - logsumexp(logcoeffs, axis=0))
+#     responsibilities = responsibilities.T
+#     print(np.sum(responsibilities, axis=0))
     
-    return responsibilities, marginal
+#     return responsibilities, marginal
 
 def main(args):
 
@@ -161,8 +162,8 @@ def main(args):
     # print(inputs_dir)
     # print(sample_name)
     # print(nclones)
-    print( str(inputs_dir / f'{sample_name}_nclones={nclones}_seed=*_result.csv') )
-    EM_results_fs = glob.glob(str(inputs_dir / f'{sample_name}_nclones={nclones}_seed=*_result.csv')) # note we are restricting to a particular nclones
+    print( str(inputs_dir / f'{sample_name}_nclones={nclones}*result.csv') )
+    EM_results_fs = glob.glob(str(inputs_dir / f'{sample_name}*nclones={nclones}*result.csv')) # note we are restricting to a particular nclones
     # print(EM_results_fs)
     EM_results_dfs = [pd.read_csv(f) for f in EM_results_fs]
     EM_summary_df = pd.concat(EM_results_dfs, ignore_index=True)
@@ -184,30 +185,15 @@ def main(args):
     nclones = int(EM_summary_df.iloc[best_idx]['nclones'])
     print(f'[INFO] best solution: seed = {seed}, nclones = {nclones}')
 
-    # copy over the best solution
-    shutil.copyfile(
-        EM_results_fs[best_idx], 
-        f'{output_prefix}_solution-EM_info.csv'
-        )
-    solution_clone_info_f = (inputs_dir / f'{sample_name}_nclones={nclones}_seed={seed}_clone_info.csv')
-    solution_pi = (inputs_dir / f'{sample_name}_nclones={nclones}_seed={seed}_pi.csv')
-    if not solution_clone_info_f.is_file() or not solution_pi.is_file():
-        print('[ERROR} clone info file or homdel file not found')
-    else:
-        shutil.copyfile(
-            f'{inputs_dir}/{sample_name}_nclones={nclones}_seed={seed}_clone_info.csv', 
-            f'{output_prefix}_solution-clone_info.csv'
-            )
-        shutil.copyfile(
-            f'{inputs_dir}/{sample_name}_nclones={nclones}_seed={seed}_pi.csv', 
-            f'{output_prefix}_solution-pi.csv'
-            )
+    solution_clone_info_f = glob.glob(str(inputs_dir / f'{sample_name}*nclones={nclones}*clone_info.csv'))[0]
+    solution_homdel_profiles = glob.glob(str(inputs_dir / f'{sample_name}*nclones={nclones}*homdel_profiles.csv'))[0]
+
     
     # ----- get sc-amplicon ploidy with best solution -----
     # ----- get clone profiles with best solution -----
     # << prepare inputs >>
     df_solution_clone_info = pd.read_csv(solution_clone_info_f)
-    df_solution_pi = pd.read_csv(solution_pi, index_col = 0)
+    df_solution_homdel_profiles = pd.read_csv(solution_homdel_profiles, index_col = 0)
 
     # -- the clone_profiles numpy array need to be clone_idx by gene_idx; and the genes need to be in the same order as the genelist
     df_wide_solution_clone_info = df_solution_clone_info.pivot(index=['clone_idx','prop'], columns='gene', values='cn')
@@ -223,15 +209,13 @@ def main(args):
         df_selected_amplicons,
         df_cell_total_read_counts, 
         genelist, 
-        # dict_clone_props, 
         list(dict_clone_props.values()),
         array_solution_clone_cn_profiles,
-        df_solution_pi,
-        homdel_params = (1e-10, 0.1)
+        df_solution_homdel_profiles.values,
         )
     cell_assignments = np.argmax(responsibilities, axis=1)
     df_cell_assignments = pd.DataFrame(cell_assignments, index = df_cell_total_read_counts.index, columns = ['clone_id'])
-    df_cell_assignments.to_csv(f'{output_prefix}_solution-cell_assignments.csv', index=True, header=True)
+    df_cell_assignments.to_csv(f'{output_prefix}_solution.cell_assignments.csv', index=True, header=True)
 
     # OUTPUT: single-cell x amplicon 
     df_sc_amplicon_ploidy = pd.DataFrame(
@@ -244,21 +228,23 @@ def main(args):
         index = df_wide_solution_clone_info.index.get_level_values(0),
         columns = df_observed_read_counts.columns,
     )
+    # invert the homdel_profiles matrix
+    df_solution_homdel_profiles = (df_solution_homdel_profiles==0).astype(int)
     for amplicon_idx, amplicon in enumerate(df_observed_read_counts):
         curr_gene = df_selected_amplicons.loc[amplicon]['gene']
         gene_idx = genelist.index(curr_gene)
-        df_sc_amplicon_ploidy.iloc[:, amplicon_idx] = array_solution_clone_cn_profiles[
+        df_sc_amplicon_ploidy[amplicon] = array_solution_clone_cn_profiles[
             df_cell_assignments['clone_id'].values, 
             gene_idx
-            ] * df_solution_pi.loc[df_cell_assignments['clone_id'].values, amplicon].values # homdel
+            ] * df_solution_homdel_profiles.loc[df_cell_assignments['clone_id'].values, amplicon].values # homdel
 
-        df_amp_clone_profiles.iloc[:, amplicon_idx] = array_solution_clone_cn_profiles[
+        df_amp_clone_profiles[amplicon] = array_solution_clone_cn_profiles[
             df_amp_clone_profiles.index.get_level_values(0), 
             gene_idx
-            ] * df_solution_pi.loc[df_amp_clone_profiles.index.get_level_values(0), amplicon].values
+            ] * df_solution_homdel_profiles.loc[df_amp_clone_profiles.index.get_level_values(0), amplicon].values
 
-    df_sc_amplicon_ploidy.to_csv(f'{output_prefix}_solution-sc_amplicon_ploidy.csv', index=True, header=True)
-    df_amp_clone_profiles.to_csv(f'{output_prefix}_solution-amp_clone_profiles.csv', index=True, header=True)
+    df_sc_amplicon_ploidy.to_csv(f'{output_prefix}_solution.sc_amplicon_ploidy.csv', index=True, header=True)
+    df_amp_clone_profiles.to_csv(f'{output_prefix}_solution.amp_clone_profiles.csv', index=True, header=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

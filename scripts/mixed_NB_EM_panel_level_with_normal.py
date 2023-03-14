@@ -322,8 +322,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--cn_calling_mode', type=str, choices= ['single-sample', 'cohort'], help='whether to do NB_EM on each sample, or a cohort')
-    parser.add_argument('--sample_name', nargs="*", help='sample name; if cohort-level run, this needs to be a list of sample names, matching the order of tsvs.')
     parser.add_argument('--cohort_name', type=str, help='cohort name', default='')
+    parser.add_argument('--sample_name', nargs="*", help='sample name; if cohort-level run, this needs to be a list of sample names, matching the order of tsvs.')
     parser.add_argument('--readcounts', nargs="*", help='read count file(s); if cohort-level run, this should be a list of rc files for all samples in cohort.')
     # parser.add_argument('--amplicon', type=str, help='amplicon dataframe containing pre-trained amplicon factors')
     parser.add_argument('--nclones', type=int, help='number of clones', default=1)
