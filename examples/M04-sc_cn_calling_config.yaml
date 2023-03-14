@@ -1,0 +1,52 @@
+top_dir: /home/zhangh5/work/Tapestri_batch2/analysis/cn_clones
+cohort_name: M04
+run_suffix: homdel_with_normal
+
+cn_calling_mode: cohort # cohort or single-sample
+panel_nseeds: 100
+panel_maxcn: 20
+panel_amplicon_parameters: /home/zhangh5/work/Tapestri_batch2/analysis/cn_clones/train-normal_samples/train-combined_8_normals/NB_train-combined_8_normals-results.gene_added.csv
+add_all_or_best: best
+
+# Number of clones to try. These will be executed in parallel.
+nclones:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+
+best_nclones: 
+    - 4
+    - 7
+    - 9 # <---- entered after inspecting `outputs/{cohort_name}_BIC_vs_nclones.png`
+amplicon_gene_map_f: /home/zhangh5/work/Tapestri_project/cn-calling/reference/panel3559_analysis.gene_cytoband.formatted.manual_adjusted.txt
+
+samples:
+    - M04-1
+    - M04-3
+    - RA19_25-12_1
+
+
+tsv_file_dict:
+    M04-1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/Caitlin/M04-1/OUTPUTS_from_mpileup/M04-1.per_amplicon_read_counts.tsv
+    M04-3: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/Caitlin/M04-3/OUTPUTS_from_mpileup/M04-3.per_amplicon_read_counts.tsv
+    RA19_25-12_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA19_25-12_1/OUTPUTS_from_mpileup/RA19_25-12_1.per_amplicon_read_counts.tsv
+
+# input_H5:
+#     RA15_06-3_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA15_06/RA15_06-3_1/OUTPUTS_from_mpileup/RA15_06-3_1.mpileup.h5
+#     RA15_06-10_1_3rd: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA15_06/RA15_06-10_1_3rd/OUTPUTS_from_m2_f/RA15_06-10_1_3rd_DNA_CNV_m2_f.h5
+#     RA15_06-13_4: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA15_06/RA15_06-13_4/OUTPUTS_from_m2_f/RA15_06-13_4_DNA_CNV_m2_f.h5
+#     RA15_06-14_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA15_06/RA15_06-14_1/OUTPUTS_from_m2_f/RA15_06-14_1_DNA_CNV_m2_f.h5
+#     RA17_46-20_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_46-20_1/OUTPUTS_from_mpileup/RA17_46-20_1.mpileup.h5
+    
+scripts:
+    cn_calling_panel_level_no_homdel: /home/zhangh5/work/Tapestri_project/cn-calling/scripts/mixed_NB_EM_panel_level_with_normal.py
+    gather_NB_EM_results_no_homdel: /home/zhangh5/work/Tapestri_project/cn-calling/scripts/gather_NB_EM_results.py 
+    cn_calling_panel_level_with_homdel: /home/zhangh5/work/Tapestri_project/cn-calling/scripts/mixed_NB_EM_homdel_PS.py
+    gather_NB_EM_results_with_homdel: /home/zhangh5/work/Tapestri_project/cn-calling/scripts/gather_NB_EM_results_homdel.py
+    plot_cn_clone_profiles: /home/zhangh5/work/Tapestri_project/cn-calling/scripts/PLOT-unique_cn_profiles.py
+    add_ploidy_layers_to_h5: /home/zhangh5/work/Tapestri_project/cn-calling/scripts/add_ploidy_layers_to_h5.py
