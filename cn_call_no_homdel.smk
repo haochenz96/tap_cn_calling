@@ -22,7 +22,7 @@ working_dir = top_dir / cohort_name / output_prefix
 print(f'[INFO] --- working directory ---- {working_dir}')
 workdir: working_dir
 
-panel_seeds=[i for i in range(config['panel_nseeds'])]
+random_seeds=[i for i in range(config['panel_nseeds'])]
 
 # ----- check run scripts exist ----- 
 for job_i in config['scripts']:
@@ -39,18 +39,18 @@ rule pass1_outputs:
     input:
         # ===== pass 1 =====
         # # call results
-        # expand('intermediate_results/{cohort_name}_nclones={nclones}_seed={seed}_result.csv', sample=samples, nclones=config['nclones'], seed=panel_seeds, output_dir = output_dir),
+        # expand('intermediate_results/{cohort_name}_nclones={nclones}_seed={seed}_result.csv', sample=samples, nclones=config['nclones'], seed=random_seeds, output_dir = output_dir),
         # # # gather NB_EM results
-        expand(
-            'cn_call_no_homdel/solutions/{cohort_name}_nclones={nclones}_solution-EM_info.csv', 
-            cohort_name = cohort_name,
-            nclones = config['nclones']
-        ),
-        expand(
-            'cn_call_no_homdel/solutions/{cohort_name}_nclones={nclones}_solution-cell_assignments.csv', 
-            cohort_name = cohort_name, 
-            nclones=config['nclones'], 
-        ),
+        # expand(
+        #     'cn_call_no_homdel/solutions/{cohort_name}_nclones={nclones}_solution-EM_info.csv', 
+        #     cohort_name = cohort_name,
+        #     nclones = config['nclones']
+        # ),
+        # expand(
+        #     'cn_call_no_homdel/solutions/{cohort_name}_nclones={nclones}_solution-cell_assignments.csv', 
+        #     cohort_name = cohort_name, 
+        #     nclones=config['nclones'], 
+        # ),
         expand(
             'cn_call_no_homdel/outputs/{cohort_name}_BIC_vs_nclones.png',
             cohort_name = cohort_name,
@@ -72,11 +72,13 @@ rule cn_calling_panel_level_no_homdel:
         python_script = config['scripts']['cn_calling_panel_level_no_homdel'],
         amplicon_df = config['panel_amplicon_parameters'],
         maxcn = config['panel_maxcn'],
+        init_maxcn = config['init_maxcn'],
     log:
         std = 'cn_call_no_homdel/intermediate_results/std/{cohort_name}_nclones={nclones}_seed={seed}.log',
         err = 'cn_call_no_homdel/intermediate_results/std/{cohort_name}_nclones={nclones}_seed={seed}.err.log',
     conda: 
         "envs/sc_cn_calling.yaml",
+    group: "cn_calling-no_homdel"
     threads: lambda wildcards, attempt: attempt * 4
     resources:
         # mem_mb = lambda wildcards, attempt: attempt * 2000,
@@ -95,13 +97,14 @@ rule cn_calling_panel_level_no_homdel:
             --seed {wildcards.seed} \
             --prefix {params.prefix} \
             --maxcn {params.maxcn} \
+            --init_maxcn {params.init_maxcn} \
             1> {log.std} 2> {log.err}
         '''
 
 rule gather_NB_EM_results_no_homdel:
 # scatter by nclones
     input:
-        EM_result_files = expand('cn_call_no_homdel/intermediate_results/{{cohort_name}}_nclones={{nclones}}_seed={seed}_result.csv', seed=panel_seeds),
+        EM_result_files = expand('cn_call_no_homdel/intermediate_results/{{cohort_name}}_nclones={{nclones}}_seed={seed}_result.csv', seed=random_seeds),
     output:
         solution_cell_assignments = 'cn_call_no_homdel/solutions/{cohort_name}_nclones={nclones}_solution-cell_assignments.csv',
         solution_EM_info = 'cn_call_no_homdel/solutions/{cohort_name}_nclones={nclones}_solution-EM_info.csv',
@@ -121,6 +124,7 @@ rule gather_NB_EM_results_no_homdel:
         err = 'cn_call_no_homdel/std/gather_NB_EM_results-{cohort_name}_nclones={nclones}.err.log',
     conda: 
         "envs/sc_cn_calling.yaml",
+    group: 'gather_cn_call_no_homdel'
     threads: 4
     resources:
         mem_mb = lambda wildcards, attempt: attempt * 2000,
@@ -175,7 +179,7 @@ checkpoint get_best_nclones:
         best_solution = {}
         for fi in fnames:
             best_solution[fi] = f'cn_call_no_homdel/solutions/{params.cohort_name}_nclones={best_nclones}_solution-{fi}.csv'
-            (output_dir / f'{params.cohort_name}_nclones={best_nclones}_solution-{fi}.csv').symlink_to(best_solution[fi])
+            # (output_dir / f'{params.cohort_name}_nclones={best_nclones}_solution-{fi}.csv').symlink_to(best_solution[fi])
         # ----- plot -----
         fig = px.line(
             EM_summary_df,

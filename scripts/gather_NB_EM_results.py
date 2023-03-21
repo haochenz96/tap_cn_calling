@@ -11,7 +11,8 @@ import numpy as np
 from scipy.stats import nbinom
 from scipy.special import logsumexp
 # from IPython import embed
-
+import matplotlib.pyplot as plt
+import seaborn as sns
 # copy & pasted from mixed_NB_EM_panel_level_with_normal.py
 def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, mixing_props, cn_profiles):    
     ncells = len(df_observed_read_counts)
@@ -111,6 +112,17 @@ def main(args):
     EM_results_dfs = [pd.read_csv(f) for f in EM_results_fs]
     EM_summary_df = pd.concat(EM_results_dfs, ignore_index=True)
 
+    # plot ranked BIC's
+    bic_sorted = EM_summary_df['BIC'].sort_values(ascending = True).reset_index(drop = True)
+    plt.figure(figsize=(7, 7))
+    ax = sns.lineplot(x = bic_sorted.index, y = bic_sorted.values)
+    ax.set_xlabel('Rank')
+    ax.set_ylabel('BIC')
+    plt.grid()
+    plt.savefig(
+        f'{output_prefix}_BIC_ranked.png', dpi=300
+        )
+        
     # identify the best solution from all seeds
     best_idx = EM_summary_df['BIC'].idxmin()
     seed = int(EM_summary_df.iloc[best_idx]['seed'])

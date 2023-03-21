@@ -12,7 +12,7 @@ from scipy.special import logsumexp
 # PS homdel method
 zero_cn_mean = 0.1
 
-def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, mixing_props, cn_profiles, homdel_profiles):
+def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicon_params, cell_total_reads, genelist, mixing_props, cn_profiles, homdel_profiles):
     '''
     E-step: get responsibilities of each cluster for each cell, assuming all other parameters are known. Also get marginal which is the total mixing props of each cluster in the population.
 
@@ -20,7 +20,7 @@ def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_am
     ----------
     df_observed_read_counts : pandas.DataFrame
         Observed read counts for each amplicon in each cell.
-    df_amplicons : pandas.DataFrame
+    df_amplicon_params : pandas.DataFrame
         Amplicon information.
     cell_total_reads : pandas.Series
         Total read counts for each cell.
@@ -44,37 +44,70 @@ def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_am
     ncells = len(df_observed_read_counts)
     nclones = cn_profiles.shape[0]
     ngenes = cn_profiles.shape[1]
-    namplicons = df_amplicons.shape[0] # M
-    amplicon_list = list(df_amplicons.index)
-    print(f'DEBUG: length of amplicon_list {len(amplicon_list)}')
+    namplicons = df_amplicon_params.shape[0] # M
+    amplicon_list = list(df_amplicon_params.index)
+    # print(f'DEBUG: length of amplicon_list {len(amplicon_list)}')
     
-    expanded_cn_profile = np.zeros((nclones, namplicons))
-    for amplicon_idx, amplicon in enumerate(amplicon_list):
-        curr_gene = df_amplicons.loc[amplicon]['gene']
-        gene_idx = genelist.index(curr_gene)
-        expanded_cn_profile[:, amplicon_idx] = cn_profiles[:, gene_idx]    
-        for clone_idx in range(nclones):
-            if cn_profiles[clone_idx, gene_idx] == 0:
-                expanded_cn_profile[clone_idx, amplicon_idx] = zero_cn_mean
-            elif homdel_profiles[clone_idx, amplicon_idx] == 1:
-                expanded_cn_profile[clone_idx, amplicon_idx] = zero_cn_mean
-            else:
-                expanded_cn_profile[clone_idx, amplicon_idx] = cn_profiles[clone_idx, gene_idx]    
+    # expanded_cn_profile = np.zeros((nclones, namplicons))
+    # for amplicon_idx, amplicon in enumerate(amplicon_list):
+    #     curr_gene = df_amplicon_params.loc[amplicon]['gene']
+    #     gene_idx = genelist.index(curr_gene)
+    #     expanded_cn_profile[:, amplicon_idx] = cn_profiles[:, gene_idx]    
+    #     for clone_idx in range(nclones):
+    #         if cn_profiles[clone_idx, gene_idx] == 0:
+    #             expanded_cn_profile[clone_idx, amplicon_idx] = zero_cn_mean
+    #         elif homdel_profiles[clone_idx, amplicon_idx] == 1:
+    #             expanded_cn_profile[clone_idx, amplicon_idx] = zero_cn_mean
+    #         else:
+    #             expanded_cn_profile[clone_idx, amplicon_idx] = cn_profiles[clone_idx, gene_idx]    
     
-    logcoeffs = np.zeros((ncells, nclones))
+    # logcoeffs = np.zeros((ncells, nclones))
     
-    for clone_idx in range(nclones):
-        mu = expanded_cn_profile[clone_idx, :] * cell_total_reads.values[:, np.newaxis] * df_amplicons['amplicon_factor'].values[np.newaxis, :]
-        phi_matrix = np.array([1]*ncells)[:, np.newaxis] * df_amplicons['phi'].values[np.newaxis, :]
+    # for clone_idx in range(nclones):
+    #     mu = expanded_cn_profile[clone_idx, :] * cell_total_reads.values[:, np.newaxis] * df_amplicon_params['amplicon_factor'].values[np.newaxis, :]
+    #     phi_matrix = np.array([1]*ncells)[:, np.newaxis] * df_amplicon_params['phi'].values[np.newaxis, :]
 
-        prob = phi_matrix / (phi_matrix + mu)
-        coeff_ij = nbinom.pmf(df_observed_read_counts.values, phi_matrix, prob)
+    #     prob = phi_matrix / (phi_matrix + mu)
+    #     coeff_ij = nbinom.pmf(df_observed_read_counts.values, phi_matrix, prob)
+    #     coeff_ij = np.where(coeff_ij == 0, 1e-300, coeff_ij)
         
-        logcoeffs[:, clone_idx] =  np.log(mixing_props[clone_idx]) + np.sum(np.log(coeff_ij), axis=1)
+    #     logcoeffs[:, clone_idx] =  np.log(mixing_props[clone_idx]) + np.sum(np.log(coeff_ij), axis=1)
 
-    marginal = np.sum(logsumexp(logcoeffs, axis=1))
-    responsibilities = np.exp(logcoeffs - logsumexp(logcoeffs, axis=1)[:, np.newaxis])
+    # marginal = np.sum(logsumexp(logcoeffs, axis=1))
+    # responsibilities = np.exp(logcoeffs - logsumexp(logcoeffs, axis=1)[:, np.newaxis])
+
+    # @HZ: 03-20-2023:
+    # ==================
+    cn_profiles_df = pd.DataFrame(cn_profiles, index = range(nclones), columns = genelist)
+    expanded_cn_profile = pd.DataFrame(
+        index = range(nclones), 
+        columns = df_observed_read_counts.columns
+        )
+    # embed()
+    expanded_cn_profile = expanded_cn_profile.apply(
+        lambda x: cn_profiles_df[df_amplicon_params.loc[x.name, 'gene']],
+    )
+
+    # --- calculate likelihood through matrix operation --- 
+    mu = (expanded_cn_profile.values.flatten() * cell_total_reads.values[:, np.newaxis]).reshape(ncells, nclones, namplicons).transpose(1, 0, 2) * df_amplicon_params['amplicon_factor'].values[np.newaxis, :] # [K x N x M]
+
+    phi_matrix = np.array([1]*ncells)[:, np.newaxis] * df_amplicon_params['phi'].values[np.newaxis, :] # [N x M]
+    prob = phi_matrix / (phi_matrix + mu) # [K x N x M]
     
+    # coeff = pi * nb_likelihood + (1 - pi) * beta_likelihood
+    coeff_ijk = nbinom.pmf(df_observed_read_counts.values, phi_matrix, prob) 
+    coeff_ijk = np.where(coeff_ijk == 0, 1e-300, coeff_ijk) # @HZ: replace 0 with a small number
+    # print('----- coeff_ijk shape: ------')
+    # print(coeff_ijk.shape)
+    logcoeffs = (np.log(mixing_props)[:, None] + np.sum(np.log(coeff_ijk), axis=2))
+    # print('----- logcoeffs shape: ------')
+    # print(logcoeffs.shape)
+
+    marginal = np.sum(logsumexp(logcoeffs, axis=0))
+    responsibilities = np.exp(logcoeffs - logsumexp(logcoeffs, axis=0))
+    responsibilities = responsibilities.T
+    # print('----- [DEBUG] responsibilities shape ------')
+    # print(responsibilities.shape)
     return responsibilities, marginal
 
 def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, responsibilities, maxcn = 8):
@@ -88,7 +121,7 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
 
     # amplicon_to_index_dict = {amplicon_list[idx]: idx for idx in range(namplicons)}
 
-    cn_profile = np.zeros((nclones, ngenes))
+    cn_profiles = np.zeros((nclones, ngenes))
     homdel_profiles = pd.DataFrame(np.ones((nclones, namplicons)), index = range(nclones), columns = df_observed_read_counts.columns)
     
     for gene_idx, gene in enumerate(genelist):
@@ -106,6 +139,8 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
             phi_matrix = np.array([1]*ncells)[:, np.newaxis] * df_gene_amplicons['phi'].values[np.newaxis, :]
             prob_zero = phi_matrix / (phi_matrix + mu_zero)
             psi_zero = nbinom.logpmf(df_gene_observed_read_counts.values, phi_matrix, prob_zero)
+            # print('----- [DEBUG] psi_zero shape ------')
+            # print(psi_zero.shape)
             homdel_coeffs = np.sum(clone_responsibilities[:, np.newaxis] * psi_zero, axis=0)
 
             cn_nb_lls_plus_per_amplicon_homdel_mask = pd.Series(range(1, maxcn + 1)).apply(
@@ -121,7 +156,7 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
             # embed()
             # sys.exit(1)
             best_cn = np.argmax(cn_nb_lls_plus_per_amplicon_homdel_mask.apply(lambda row_i: row_i[0])) + 1
-            cn_profile[clone_idx, gene_idx] = best_cn
+            cn_profiles[clone_idx, gene_idx] = best_cn
             homdel_profiles.loc[clone_idx, df_gene_amplicons.index] = cn_nb_lls_plus_per_amplicon_homdel_mask.iloc[best_cn-1][1]
 
             # max_coeff = -np.inf
@@ -138,14 +173,14 @@ def get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_rea
             #     # print(curr_coeff, gene_idx, clone_idx, cn)
             #     if curr_coeff > max_coeff:
             #         max_coeff = curr_coeff
-            #         cn_profile[clone_idx, gene_idx] = cn
+            #         cn_profiles[clone_idx, gene_idx] = cn
             
-            # print('updated', gene_idx, clone_idx, cn_profile[clone_idx, gene_idx])
+            # print('updated', gene_idx, clone_idx, cn_profiles[clone_idx, gene_idx])
 
-    cn_profile[-1,:] = 2
+    cn_profiles[-1,:] = 2
     homdel_profiles.iloc[-1, :] = 0
     
-    return cn_profile, homdel_profiles
+    return cn_profiles, homdel_profiles
 
 def _evaluate_coeff(responsibilities, df_gene_observed_read_counts, df_gene_amplicons, cell_total_reads, cn, homdel_coeffs):
     '''
@@ -182,7 +217,7 @@ def _evaluate_coeff(responsibilities, df_gene_observed_read_counts, df_gene_ampl
 
     return total_coeff, per_amplicon_homdel_mask    
 
-def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, nclones=1, cn_max=8, maxiter=20, seed=0, tol = 1e-6, predefined_cn_clone_info = None, predefined_cn_clone_props = None, init_guess_maxcn = None):
+def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, nclones=1, cn_max=8, maxiter=20, seed=0, tol = 1e-6, predefined_cn_clone_info = None, predefined_cn_clone_props = None, init_maxcn = None):
     '''
     EM algorithm for mixed negative binomial model with fixed dispersion.
 
@@ -195,7 +230,7 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         A predefined cn profile for each clone. If not None, the algorithm will use this as the initial guess.
     predefined_cn_clone_props: list
         A predefined mixing proportion for each clone. If not None, the algorithm will use this as the initial guess.
-    init_guess_maxcn: int
+    init_maxcn: int
         The maximum copy number to use for the initial guess. If None, it will use cn_max.
 
     '''
@@ -206,11 +241,11 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
     ngenes = len(genelist)
     namplicons = len(df_amplicons)
 
-    if init_guess_maxcn is None:
-        init_guess_maxcn = cn_max
-    elif init_guess_maxcn > cn_max:
-        raise('[WARNING] init_guess_maxcn cannot be larger than cn_max, setting it to cn_max')
-        init_guess_maxcn = cn_max
+    if init_maxcn is None:
+        init_maxcn = cn_max
+    elif init_maxcn > cn_max:
+        raise('[WARNING] init_maxcn cannot be larger than cn_max, setting it to cn_max')
+        init_maxcn = cn_max
     else:
         pass
 
@@ -219,13 +254,14 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         cn_profiles = predefined_cn_clone_info
         # nclones = cn_profiles.shape[0]
         if predefined_cn_clone_props is not None:
-            mixing_props = predefined_cn_clone_props
+            mixing_props = predefined_cn_clone_props.flatten().tolist() # @HZ 03/20/2023: convert to list
         else:
             mixing_props = [1/nclones]*nclones
-        
+        print('===== [DEBUG] mixing props =====')
+        print(mixing_props)
         if nclones > cn_profiles.shape[0]:
             # if nclones greater than previous solution's nclones, add random clones, with equal mixing proportions
-            cn_profiles = np.vstack([cn_profiles, np.random.randint(init_guess_maxcn - 1, size=(nclones - cn_profiles.shape[0], ngenes)) + 1])
+            cn_profiles = np.vstack([cn_profiles, np.random.randint(init_maxcn - 1, size=(nclones - cn_profiles.shape[0], ngenes)) + 1])
             mixing_props = [ prop_i * cn_profiles.shape[0] / nclones for prop_i in mixing_props] + [(1-cn_profiles.shape[0]/nclones)/(nclones-cn_profiles.shape[0])]* (nclones-cn_profiles.shape[0])
         elif nclones < cn_profiles.shape[0]:
             nclones = cn_profiles.shape[0]
@@ -234,7 +270,7 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         # randomly initialize the CN profiles and mixing proportions
         # initialize the CN profiles with a diploid clone and N-1 random ploidy clones
         # initialize the mixing proportions with uniform probability
-        cn_profiles = np.random.randint(cn_max - 1, size=(nclones - 1, ngenes)) + 1 # note to avoid initialize with a CN=0
+        cn_profiles = np.random.randint(init_maxcn - 1, size=(nclones - 1, ngenes)) + 1 # note to avoid initialize with a CN=0
         cn_profiles = np.vstack([cn_profiles, np.ones((1, ngenes))*2])
         mixing_props = [1/nclones]*nclones
     
@@ -358,18 +394,24 @@ def main(args):
     cell_total_read_counts = df_tsv.sum(axis = 1)
 
     # parse predefined cn profiles
-    if args.predefined_cn_clone_info is not None:
-        df_predefined_cn_profiles = pd.read_csv(args.predefined_cn_clone_info, header=0, index_col=None)
-        # -- the clone_profiles numpy array need to be clone_idx by gene_idx; and the genes need to be in the same order as the genelist
-        df_wide_solution_clone_info = df_predefined_cn_profiles.pivot(index=['clone_idx','prop'], columns='gene', values='cn').reset_index()
-        array_predefined_cn_profiles = df_wide_solution_clone_info.loc[:, genelist].values
-        # -- the clone_props needs to be an ordered list of clone_prop of each CN clone
-        array_clone_props = df_wide_solution_clone_info.loc[:, ['prop']].values
+    if args.start_from_best_sol == 'yes':
+        try:
+            df_predefined_cn_clone_info = pd.read_csv(args.predefined_cn_clone_info, header=0, index_col=None)
+            # -- the clone_profiles numpy array need to be clone_idx by gene_idx; and the genes need to be in the same order as the genelist
+            df_wide_solution_clone_info = df_predefined_cn_clone_info.pivot(index=['clone_idx','prop'], columns='gene', values='cn').reset_index()
+            array_predefined_cn_profiles = df_wide_solution_clone_info.loc[:, genelist].values
+            # -- the clone_props needs to be an ordered list of clone_prop of each CN clone
+            array_clone_props = df_wide_solution_clone_info.loc[:, ['prop']].values
+        except Exception as e:
+            print(f'Error: failed to parse predefined cn profiles from {args.predefined_cn_clone_info}')
+            print(e)
+            exit(1)
     else:
         array_predefined_cn_profiles = None
         array_clone_props = None
-
-    init_guess_maxcn = args.maxcn
+    
+    maxcn = args.maxcn
+    init_maxcn = args.init_maxcn
 
     # multiple restarts of EM @HZ- DEPRECATED?
     nrestarts = args.nrestarts
@@ -377,15 +419,19 @@ def main(args):
     
     seed_list = np.random.permutation(np.arange(100))[:nrestarts]
     for restart_idx in range(nrestarts):
-        inferred_mixing_props, inferred_cn_profiles, homdel_profiles,df_EM = mixed_NB_EM_fixed_dispersion_panel_level(
-            df_observed_read_counts, 
-            df_selected_amplicons, 
-            cell_total_read_counts, 
-            genelist, 
-            nclones=nclones, 
-            cn_max = args.maxcn, 
-            seed=seed_list[restart_idx], predefined_cn_clone_info=array_predefined_cn_profiles, predefined_cn_clone_props=array_clone_props, init_guess_maxcn=init_guess_maxcn
-            )
+        try:
+            inferred_mixing_props, inferred_cn_profiles, homdel_profiles,df_EM = mixed_NB_EM_fixed_dispersion_panel_level(
+                df_observed_read_counts, 
+                df_selected_amplicons, 
+                cell_total_read_counts, 
+                genelist, 
+                nclones=nclones, 
+                cn_max = maxcn, 
+                seed=seed_list[restart_idx], predefined_cn_clone_info=array_predefined_cn_profiles, predefined_cn_clone_props=array_clone_props, init_maxcn=init_maxcn
+                )
+        except:
+            embed()
+            sys.exit(1)
         
         curr_max_marginal = df_EM.iloc[-1]['marginal']
         
@@ -434,18 +480,19 @@ if __name__ == "__main__":
     parser.add_argument('--cohort_name', type=str, help='cohort name', default='')
     parser.add_argument('--readcounts', nargs="*", help='read count file(s); if cohort-level run, this should be a list of rc files for all samples in cohort.')
     # parser.add_argument('--amplicon', type=str, help='amplicon dataframe containing pre-trained amplicon factors')
-    parser.add_argument('--nclones', type=int, help='number of clones to run the clustering', default=1)
     parser.add_argument('--amplicon_parameters_f', type=str, help='''
     amplicon parameters dataframe containing the following necessary columns: 
         - amplicon_ID (AMPL41099') in the first column to be used as index;
         - 'gene', the corresponding gene's Hugo_Symbol for each amplicon;
         - 'amplicon_factor' & 'alpha' & 'beta_zero' & 'beta_one' & 'method' & 'mean' & 'variance' trained NB parameters specific for each amplicon.
     ''')
+    parser.add_argument('--nclones', type=int, help='number of clones to run the clustering', default=1)
+    parser.add_argument('--start_from_best_sol', type=str, choices=['yes', 'no'], help='whether to start from the best solution from previous run', default='no')
+    parser.add_argument('--predefined_cn_clone_info', type=str, help='for homdel training, can start from previous optimal solution. This is the `{prefix}-clone_info.csv` file output by the NB-EM_CN_caller without homdel. Necessary columns are `clone_idx`,`prop`,`gene`, `cn`. Note that if the nclones from the previous solution is smaller than the currently defined nclones, random clones will be appended with uniform distribution.')
     parser.add_argument('--nrestarts', type=int, help='number of restarts', default=1)
     parser.add_argument('--seed', type=int, help='seed', default=0)
-    parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)   
-    parser.add_argument('--predefined_cn_clone_info', type=str, help='for homdel training, can start from previous optimal solution. This is the `{prefix}-clone_info.csv` file output by the NB-EM_CN_caller without homdel. Necessary columns are `clone_idx`,`prop`,`gene`, `cn`. Note that if the nclones from the previous solution is smaller than the currently defined nclones, random clones will be appended with uniform distribution.')
-    parser.add_argument('--init_guess_maxcn', type=int, help='limit the maximum possible copy number for the initial guess', default=3)
+    parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)       
+    parser.add_argument('--init_maxcn', type=int, help='limit the maximum possible copy number for the initial guess', default=3)
     parser.add_argument('--prefix', type=str, help='prefix for output files')
 
     args = parser.parse_args(None if sys.argv[1:] else ['-h'])

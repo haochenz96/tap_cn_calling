@@ -66,50 +66,69 @@ def main(args):
     else:
         GENE_COL_NAME = 'gene' if 'gene' in amp_gene_map_df.columns else 'gene_name'
     
-    assert 'clone_id' in sample_sc_clone_assignment_df.columns, '[WARNING] sample_sc_clone_assignment_df must have "cluster_id" column'
-    sample_sc_clone_assignment_df.columns = ['sample', 'sc_idx', 'cluster_id']
+    assert 'clone_id' in sample_sc_clone_assignment_df.columns, '[WARNING] sample_sc_clone_assignment_df must have "clone_id" column'
+    sample_sc_clone_assignment_df.columns = ['sample', 'cell_barcode', 'clone_id']
 
-    # by design, clusters with identical CN profiles should not be in sample_sc_clone_assignment_df, but if they do, we remove them:
-    # @HZ TODO: this is still faulty
-    duplicated_clusters = []
-    if not cn_clone_profiles_df.shape[0] == sample_sc_clone_assignment_df['cluster_id'].unique().shape[0]:
-        logging.warning('sample_sc_clone_assignment_df has duplicated clusters, removing them now...')
-        
-        for cluster_i in cn_clone_profiles_df.index.unique():
-            if cluster_i in duplicated_clusters:
+    # --> 1. remove duplicated clones
+    # by design, clones with identical CN profiles should not be in sample_sc_clone_assignment_df, but if they do, we remove them:
+    duplicated_clones = []
+    
+    for cluster_i in cn_clone_profiles_df.index.unique():
+        if cluster_i in duplicated_clones:
+            continue
+        for cluster_j in cn_clone_profiles_df.index.unique():
+            if cluster_i == cluster_j:
                 continue
-            for cluster_j in cn_clone_profiles_df.index.unique():
-                if cluster_i == cluster_j:
-                    continue
-                if (cn_clone_profiles_df.loc[cluster_i] == cn_clone_profiles_df.loc[cluster_j]).all():
-                    # in the sample_sc_clone_assignment_df, replace cluster_j with cluster_i
-                    logging.info(f'{cluster_i} and {cluster_j} are identical')
-                    print(f'[WARNING] {cluster_i} and {cluster_j} are identical')
-                    duplicated_clusters.append(cluster_j)
-                    sample_sc_clone_assignment_df.loc[sample_sc_clone_assignment_df['cluster_id'] == cluster_j, 'cluster_id'] = cluster_i
-        # remove duplicated clusters
-    unique_cn_clone_profiles_df = cn_clone_profiles_df.drop(duplicated_clusters, axis=0) # delete cluster_j in cn_clone_profiles_df
+            if (cn_clone_profiles_df.loc[cluster_i] == cn_clone_profiles_df.loc[cluster_j]).all():
+                # in the sample_sc_clone_assignment_df, replace cluster_j with cluster_i
+                logging.info(f'{cluster_i} and {cluster_j} are identical')
+                print(f'[WARNING] {cluster_i} and {cluster_j} are identical')
+                duplicated_clones.append(cluster_j)
+                sample_sc_clone_assignment_df.loc[sample_sc_clone_assignment_df['clone_id'] == cluster_j, 'clone_id'] = cluster_i
+    # --> 2. remove nonexistant clones
+    # if a clone is not in sample_sc_clone_assignment_df, remove it from cn_clone_profiles_df
+    nonexistant_clones = []
+    for cluster_i in cn_clone_profiles_df.index.unique():
+        if cluster_i in duplicated_clones:
+            continue
+        if cluster_i not in sample_sc_clone_assignment_df['clone_id'].unique():
+            nonexistant_clones.append(cluster_i)
+    logging.info(f'nonexistant_clones: {nonexistant_clones}')
+    print(f'[WARNING] nonexistant_clones: {nonexistant_clones}')
 
-    # cluser_name_rename_map = dict(zip(unique_cn_clone_profiles_df.index, np.arange(unique_cn_clone_profiles_df.shape[0])))
-    # unique_cn_clone_profiles_df.index = np.arange(unique_cn_clone_profiles_df.shape[0])
-    # # remember to rename the sample_sc_clone_assignment_df
-    # sample_sc_clone_assignment_df['cluster_id'] = sample_sc_clone_assignment_df['cluster_id'].map(cluser_name_rename_map)
+    clones_to_remove = duplicated_clones + nonexistant_clones
+    unique_cn_clone_profiles_df = cn_clone_profiles_df.drop(clones_to_remove, axis=0) # delete cluster_j's in cn_clone_profiles_df
 
-    # non-converged amplicons
+    # move last row, which is by design the normal, diploid clone, to the top
+    unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.iloc[-1:].append(unique_cn_clone_profiles_df.iloc[:-1])
+        
+    # @HZ 03/20/2023: rename the clones for simplicity
+    cluster_rename_map = dict(zip(
+        unique_cn_clone_profiles_df.index, 
+        np.arange(unique_cn_clone_profiles_df.shape[0]))
+        )
+    sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(cluster_rename_map)
+    sample_sc_clone_assignment_df.to_csv(
+        output_dir / f'{cohort_name}{output_f_prefix}.sample_sc_clone_assignment.updated.csv',
+        index=False, header=True
+    )
+    unique_cn_clone_profiles_df.index = unique_cn_clone_profiles_df.index.map(cluster_rename_map)
+
+    # reset index, fill in non-converged amplicons
     unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.reindex(columns = amp_gene_map_df.index, fill_value=-1)
     
     unique_cn_clone_profiles_df.to_csv(
         output_dir / f'{cohort_name}{output_f_prefix}.unique_cn_clone_profiles.csv',
         index=True, header=True
     )
-
+    
     # _____________________
 
     # ----- plotting params -----
     # Draw cluster labels
     # cluster_labels = np.arange(unique_cn_clone_profiles_df.shape[0])
     cluster_labels = unique_cn_clone_profiles_df.index.values
-    logging.info(f"identified {len(cluster_labels)} unique clusters")
+    logging.info(f"identified {len(cluster_labels)} unique clones")
     # embed()
     cn_clone_palette = dict(zip(cluster_labels, np.array(px.colors.qualitative.Set3)[cluster_labels]))
     cluster_colors = [cn_clone_palette[i] for i in cluster_labels]
@@ -210,13 +229,13 @@ def main(args):
     # update color schemes
     num_vals = 7
     colorscale = [
-        (0, 'rgb(163, 163, 163)'), (1/num_vals, 'rgb(163, 163, 163)'),
-        (1/num_vals, 'rgb(0,0,0)'), (2/num_vals, 'rgb(0,0,0)'),
-        (2/num_vals, 'rgb(7, 95, 237)'), (3/num_vals, 'rgb(7, 95, 237)'),
-        (3/num_vals, 'rgb(146, 170, 209)'), (4/num_vals, 'rgb(146, 170, 209)'), 
-        (4/num_vals, 'rgb(237, 156, 57)'), (5/num_vals, 'rgb(237, 156, 57)'),
-        (5/num_vals, 'rgb(242, 29, 22)'), (6/num_vals, 'rgb(242, 29, 22)'),
-        (6/num_vals, 'rgb(163, 8, 60)'), (1, 'rgb(163, 8, 60)')
+        (0, 'rgb(163, 163, 163)'), (1/num_vals, 'rgb(163, 163, 163)'), # NA
+        (1/num_vals, 'rgb(0,0,0)'), (2/num_vals, 'rgb(0,0,0)'), # 0
+        (2/num_vals, 'rgb(7, 95, 237)'), (3/num_vals, 'rgb(7, 95, 237)'), # 1
+        (3/num_vals, 'rgb(146, 170, 209)'), (4/num_vals, 'rgb(146, 170, 209)'), # 2 
+        (4/num_vals, 'rgb(237, 156, 57)'), (5/num_vals, 'rgb(237, 156, 57)'), # 3
+        (5/num_vals, 'rgb(242, 29, 22)'), (6/num_vals, 'rgb(242, 29, 22)'), # 4
+        (6/num_vals, 'rgb(202, 82, 250)'), (1, 'rgb(202, 82, 250)') # 5+
         ]
 
     colorbar_ticktext=[str(i) for i in list(range(num_vals-1))]
@@ -252,7 +271,7 @@ def main(args):
     fig = px.histogram(
         sample_sc_clone_assignment_df,
         x = 'sample',
-        color = 'cluster_id',
+        color = 'clone_id',
         color_discrete_map = cn_clone_palette,
         barnorm = 'percent',
         )
@@ -300,7 +319,9 @@ def main(args):
             # _________________________
 
             homdel_amps = unique_cn_clone_profiles_df.columns[(unique_cn_clone_profiles_df == 0).any(axis=0)].tolist()
+            print(f"homdel_amps: {homdel_amps}")
             homdel_genes = amp_params_df.loc[homdel_amps, 'gene'].unique()
+            print(f"homdel_genes: {homdel_genes}")
             control_genes = ["KRAS", 'TP53', 'SMAD4', 'CDKN2A', 'TGFBR2'] # <------- @TODO: make more customizable
             if args.homdel_genes_oi is not None:
                 control_genes += args.homdel_genes_oi
@@ -311,12 +332,12 @@ def main(args):
                 [pd.read_csv(f, sep='\t', index_col = 0) for f in rc_tsvs], 
                 keys = sample_names,
             )
-            sample_sc_clone_assignment_df.set_index(['sample', 'sc_idx'], inplace=True)
+            sample_sc_clone_assignment_df.set_index(['sample', 'cell_barcode'], inplace=True)
             for sample_i in sample_names:
                 assert concat_rc_df.loc[sample_i, :].shape[0] == sample_sc_clone_assignment_df.loc[sample_i, :].shape[0], f"Number of rows in raw read count data for sample {sample_i} does not match the number of cells in the sample."
             # embed()
             rcs_melted = pd.melt(concat_rc_df[homdel_amps], ignore_index=False, var_name = 'amplicon', value_name = 'read_counts')
-            rcs_melted['cn_cluster'] = rcs_melted.index.map(lambda x: sample_sc_clone_assignment_df.loc[x, 'cluster_id'])
+            rcs_melted['cn_cluster'] = rcs_melted.index.map(lambda x: sample_sc_clone_assignment_df.loc[x, 'clone_id'])
 
             rc_dist_plots = {}
             rc_box_plots = {}
@@ -329,7 +350,7 @@ def main(args):
                 # normalize by amplicon factor and cell total read counts
                 concat_rc_df_normed = concat_rc_df[amps_i] / amp_params_df.loc[amps_i]['amplicon_factor'] / concat_rc_df.sum(axis=1).values[:, None]
                 rcs_i = pd.melt(concat_rc_df_normed, ignore_index=False, var_name = 'amplicon', value_name = 'read_counts')
-                rcs_i['cn_cluster'] = rcs_i.index.map(lambda x: sample_sc_clone_assignment_df.loc[x, 'cluster_id'])
+                rcs_i['cn_cluster'] = rcs_i.index.map(lambda x: sample_sc_clone_assignment_df.loc[x, 'clone_id'])
 
                 # rc_dist_plots[gene_i] = px.histogram(
                 #     data_frame = rcs_i,
@@ -375,7 +396,7 @@ if __name__ == "__main__":
     parser.add_argument('--cohort_name', type=str, required=True)
     parser.add_argument('--amp_gene_map_f', type=str, required=True, help = 'CSV/TSV file with amplicon IDs in the first column. Required columns: `chr` and `gene`. Please make sure the amplicon IDs are ordered by genomic coordinates for best plotting results.')
     parser.add_argument('--cn_clone_profiles_csv', type=str, help='amplicon-level CN clone profile', required=True)
-    parser.add_argument('--sample_sc_clone_assignment_csv', type=str, help='df assigning each sample, each single cell to each CN cluster. Therefore the 3 columns, in order, must be `sample_name`, `single-cell ID`, `cluster_id`. Only the `cluster_id` column needs to be named.', required=True)
+    parser.add_argument('--sample_sc_clone_assignment_csv', type=str, help='df assigning each sample, each single cell to each CN cluster. Therefore the 3 columns, in order, must be `sample_name`, `single-cell ID`, `clone_id`. Only the `clone_id` column needs to be named.', required=True)
     parser.add_argument('--output_dir', type=str, help='output directory', required=True)
     parser.add_argument('--output_f_prefix', type=str, help='output file prefix', default='')
     parser.add_argument('--plot_homdel', type=bool, help='for genes likely affected by homdel, plot distribution of all its amplicons', default=False)

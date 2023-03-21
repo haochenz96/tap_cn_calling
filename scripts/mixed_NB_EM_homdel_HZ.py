@@ -6,6 +6,8 @@ import sys
 from scipy.stats import nbinom
 from scipy.special import logsumexp
 
+from IPython import embed
+
 def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicon_params, cell_total_reads, genelist, mixing_props, cn_profiles_df, pi, homdel_params):
     '''
     E-step: get responsibilities of each cluster for each cell, assuming all other parameters are known. Also get marginal which is the total mixing props of each cluster in the population.
@@ -318,9 +320,11 @@ def main(args):
     
     seed_list = np.random.permutation(np.arange(100))[:nrestarts]
     for restart_idx in range(nrestarts):
-        inferred_mixing_props, inferred_cn_profiles, inferred_pi, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts,
-                                                                                                      genelist, nclones=nclones, cn_max = args.maxcn,
-                                                                                                      seed=seed_list[restart_idx])
+        try:
+            inferred_mixing_props, inferred_cn_profiles, inferred_pi, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts, genelist, nclones=nclones, cn_max = args.maxcn, seed=seed_list[restart_idx])
+        except:
+            embed()
+            sys.exit(1)
         
         curr_max_marginal = df_EM.iloc[-1]['marginal']
         

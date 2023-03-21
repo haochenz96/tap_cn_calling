@@ -145,7 +145,7 @@ def _evaluate_coeff(responsibilities, df_gene_observed_read_counts, df_gene_ampl
     # print(np.sum(np.isnan(psi)), np.sum(np.isnan(responsibilities)))
     return sum(responsibilities * np.sum(psi, axis=1))
 
-def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, nclones=1, cn_max=8, maxiter=20, seed=0, tol = 1e-6):
+def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, nclones=1, cn_max=8, maxiter=20, seed=0, tol = 1e-6, init_guess_maxcn = None):
     
     df_amplicons = df_amplicons.loc[df_observed_read_counts.columns]
     
@@ -153,12 +153,20 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
     ncells = len(df_observed_read_counts)
     ngenes = len(genelist)
     
+    if init_guess_maxcn is None:
+        init_guess_maxcn = cn_max
+    elif init_guess_maxcn > cn_max:
+        raise('[WARNING] init_guess_maxcn cannot be larger than cn_max, setting it to cn_max')
+        init_guess_maxcn = cn_max
+    else:
+        pass
+
     # initial guess
     # initialize the CN profiles with a diploid clone and N-1 random ploidy clones
     # initialize the mixing proportions with uniform probability
+    cn_profiles = np.random.randint(init_guess_maxcn - 1, size=(nclones - 1, ngenes)) + 1 # note to avoid initialize with a CN=0
+    cn_profiles = np.vstack([cn_profiles, np.ones((1, ngenes))*2])
     mixing_props = [1/nclones]*nclones
-    cn_profiles = np.random.randint(cn_max - 1, size=(nclones - 1, ngenes)) + 1
-    cn_profiles = np.vstack([cn_profiles, np.ones((1, ngenes))*2]) 
     print('='*20)
     print('----- initial guess -----')
     print(cn_profiles)
@@ -271,11 +279,13 @@ def main(args):
     nrestarts = args.nrestarts
     max_marginal = -np.inf
     
+    # set max CN
+    maxcn = args.maxcn
+    init_maxcn = args.init_maxcn
+
     seed_list = np.random.permutation(np.arange(100))[:nrestarts]
     for restart_idx in range(nrestarts):
-        inferred_mixing_props, inferred_cn_profiles, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts,
-                                                                                                      genelist, nclones=nclones, cn_max = args.maxcn,
-                                                                                                      seed=seed_list[restart_idx])
+        inferred_mixing_props, inferred_cn_profiles, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts, genelist, nclones=nclones, cn_max = maxcn, seed=seed_list[restart_idx], init_guess_maxcn=init_maxcn)
         
         curr_max_marginal = df_EM.iloc[-1]['marginal']
         
@@ -335,7 +345,8 @@ if __name__ == "__main__":
     ''')
     parser.add_argument('--nrestarts', type=int, help='number of restarts', default=1)
     parser.add_argument('--seed', type=int, help='seed', default=0)
-    parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)     
+    parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)    
+    parser.add_argument('--init_maxcn', type=int, help='limit the maximum possible copy number for the initial guess', default=3) 
     parser.add_argument('--prefix', type=str, help='prefix for output files')
 
     args = parser.parse_args(None if sys.argv[1:] else ['-h'])

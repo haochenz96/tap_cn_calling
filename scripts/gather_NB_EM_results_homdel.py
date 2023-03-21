@@ -184,11 +184,14 @@ def main(args):
     seed = int(EM_summary_df.iloc[best_idx]['seed'])
     nclones = int(EM_summary_df.iloc[best_idx]['nclones'])
     print(f'[INFO] best solution: seed = {seed}, nclones = {nclones}')
+    try:
+        solution_clone_info_f = glob.glob(str(inputs_dir / f'{sample_name}*nclones={nclones}*seed={seed}*clone_info.csv'))[0]
+        solution_homdel_profiles = glob.glob(str(inputs_dir / f'{sample_name}*nclones={nclones}*seed={seed}*homdel_profiles.csv'))[0]
+    except Exception as e:
+        print(e)
+        print(f'[ERROR] no solution found for seed = {seed}, nclones = {nclones}')
+        exit(1)
 
-    solution_clone_info_f = glob.glob(str(inputs_dir / f'{sample_name}*nclones={nclones}*clone_info.csv'))[0]
-    solution_homdel_profiles = glob.glob(str(inputs_dir / f'{sample_name}*nclones={nclones}*homdel_profiles.csv'))[0]
-
-    
     # ----- get sc-amplicon ploidy with best solution -----
     # ----- get clone profiles with best solution -----
     # << prepare inputs >>
