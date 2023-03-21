@@ -270,7 +270,8 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         # randomly initialize the CN profiles and mixing proportions
         # initialize the CN profiles with a diploid clone and N-1 random ploidy clones
         # initialize the mixing proportions with uniform probability
-        cn_profiles = np.random.randint(init_maxcn - 1, size=(nclones - 1, ngenes)) + 1 # note to avoid initialize with a CN=0
+#         cn_profiles = np.random.randint(init_maxcn - 1, size=(nclones - 1, ngenes)) + 1 # note to avoid initialize with a CN=0
+        cn_profiles = np.random.randint(2, size=(nclones - 1, ngenes)) + 1 # note to avoid initialize with a CN=0
         cn_profiles = np.vstack([cn_profiles, np.ones((1, ngenes))*2])
         mixing_props = [1/nclones]*nclones
     
