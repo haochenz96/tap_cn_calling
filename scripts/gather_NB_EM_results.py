@@ -49,6 +49,7 @@ def main(args):
     # ----- prepare inputs ----- 
     # <<< inputs >>> 
     # prepare the input data
+    nclones = args.nclones
     cn_calling_mode = args.cn_calling_mode
     if cn_calling_mode not in ['single-sample', 'cohort']:
         print('Error: cn_calling_mode must be either single-sample or cohort')
@@ -77,21 +78,12 @@ def main(args):
             keys = sample_names,
             )
     num_unique_amplicons = len(df_tsv.columns)
-    df_cell_total_read_counts = df_tsv.sum(axis = 1)
 
-    df_selected_amplicons = pd.read_csv(args.amplicon_parameters_f, index_col = 0)
-    df_selected_amplicons = df_selected_amplicons.loc[df_selected_amplicons['converged'] == True] # filter out unconverged amplicons
-    df_selected_amplicons['phi'] = 1 / df_selected_amplicons['alpha']
-
-    nclones = args.nclones
-    genelist = list(df_selected_amplicons['gene'].unique())
-    ngenes = len(genelist)
-    
-    # subset to amplicons of interest
-    curr_selected_amplicons = list(df_selected_amplicons.index)
-    print(f'[INFO] number of selected amplicons: {len(curr_selected_amplicons)} / {num_unique_amplicons}')
-    df_observed_read_counts = df_tsv[curr_selected_amplicons]
-
+    # amplicon parameters df
+    df_amplicon_params = pd.read_csv(args.amplicon_parameters_f, index_col = 0)
+    # df_amplicon_params = df_amplicon_params.loc[df_amplicon_params['converged'] == True] # filter out unconverged amplicons
+    df_amplicon_params['phi'] = 1 / df_amplicon_params['alpha']
+        
     # <<< intermediate outputs >>>
     inputs_dir = Path(args.inputs_dir)
 
@@ -103,10 +95,10 @@ def main(args):
         outputs_dir.mkdir(parents=True, exist_ok=True)
 
     # ----- summarize EM results -----
-    print(inputs_dir)
-    print(sample_name)
-    print(nclones)
-    print( str(inputs_dir / f'{sample_name}_nclones={nclones}_seed=*_result.csv'))
+    # print(inputs_dir)
+    # print(sample_name)
+    # print(nclones)
+    # print( str(inputs_dir / f'{sample_name}_nclones={nclones}_seed=*_result.csv'))
     EM_results_fs = glob.glob(str(inputs_dir / f'{sample_name}_nclones={nclones}_seed=*_result.csv')) # note we are restricting to a particular nclones
     print(EM_results_fs)
     EM_results_dfs = [pd.read_csv(f) for f in EM_results_fs]
@@ -143,9 +135,19 @@ def main(args):
             f'{output_prefix}_solution-clone_info.csv'
             )
     
-    # ----- get sc-amplicon ploidy with best solution
+    # ----- get sc-amplicon ploidy with best solution -----
     # << prepare inputs >>
     df_solution_clone_info = pd.read_csv(solution_clone_info_f)
+    
+    # subset to amplicons of interest
+    genelist = df_solution_clone_info['gene'].unique().tolist()
+    ngenes = len(genelist)
+    curr_selected_amplicons = df_amplicon_params.loc[df_amplicon_params['gene'].isin(genelist)].index.tolist()
+    print(f'[INFO] number of selected amplicons: {len(curr_selected_amplicons)} / {num_unique_amplicons}')
+    df_observed_read_counts = df_tsv[curr_selected_amplicons]
+    df_amplicon_params = df_amplicon_params.loc[curr_selected_amplicons, :]
+    df_cell_total_read_counts = df_observed_read_counts.sum(axis = 1)
+
     # -- the clone_profiles numpy array need to be clone_idx by gene_idx; and the genes need to be in the same order as the genelist
     df_wide_solution_clone_info = df_solution_clone_info.pivot(index=['clone_idx','prop'], columns='gene', values='cn').reset_index()
     array_solution_clone_cn_profiles = df_wide_solution_clone_info.loc[:, genelist].values
@@ -155,7 +157,7 @@ def main(args):
     # get responsibilities
     responsibilities, _ = get_responsibilities_and_marginal_panel_level(
         df_observed_read_counts, 
-        df_selected_amplicons,
+        df_amplicon_params,
         df_cell_total_read_counts, 
         genelist, 
         dict_clone_props, 
@@ -175,7 +177,7 @@ def main(args):
         columns = df_observed_read_counts.columns,
     )
     for amplicon_idx, amplicon in enumerate(df_observed_read_counts):
-        curr_gene = df_selected_amplicons.loc[amplicon]['gene']
+        curr_gene = df_amplicon_params.loc[amplicon]['gene']
         gene_idx = genelist.index(curr_gene)
         df_sc_amplicon_ploidy.iloc[:, amplicon_idx] = array_solution_clone_cn_profiles[
             df_cell_assignments['clone_id'].values, 

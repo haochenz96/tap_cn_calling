@@ -259,19 +259,38 @@ def main(args):
             keys = sample_names,
             )
         
-    df_selected_amplicons = pd.read_csv(args.amplicon_parameters_f, index_col = 0)
-    num_total_amplicons = df_selected_amplicons.shape[0]
-    df_selected_amplicons = df_selected_amplicons.loc[df_selected_amplicons['converged'] == True] # filter out unconverged amplicons
-    num_converge_amplicons = df_selected_amplicons.shape[0]
-    print(f'[INFO] using {num_converge_amplicons}/{num_total_amplicons} converged amplicons'
-    )
-    df_selected_amplicons['phi'] = 1 / df_selected_amplicons['alpha']
+    df_amplicon_params = pd.read_csv(args.amplicon_parameters_f, index_col = 0)
+    num_total_amplicons = df_amplicon_params.shape[0]
+    num_total_genes = len(df_amplicon_params['gene'].unique())
+    df_amplicon_params['phi'] = 1 / df_amplicon_params['alpha']
     nclones = args.nclones
     
-    genelist = list(df_selected_amplicons['gene'].unique())
-    ngenes = len(genelist)
+    # @HZ 04/03/2023: add option to subset to genes of interest
+    if args.genes_of_interest is None:
+        genes_of_interest = list(df_amplicon_params['gene'].unique())
+    else:
+        genes_of_interest = args.genes_of_interest
+
+    gene_vc = df_amplicon_params['gene'].value_counts()
+    genes_with_min_namps = gene_vc[gene_vc >= args.min_num_amps_per_gene].index.tolist()
+
+    filtered_genelist = list(set(genes_of_interest) & set(genes_with_min_namps))
+    ngenes = len(filtered_genelist)
     
-    curr_selected_amplicons = list(df_selected_amplicons.index)
+    curr_selected_amplicons = df_amplicon_params.index[
+        df_amplicon_params['gene'].isin(filtered_genelist) & \
+        (df_amplicon_params['converged'] == True) # filter out unconverged amplicons
+    ]
+
+    df_amplicon_params = df_amplicon_params.loc[curr_selected_amplicons, :]
+    print(f'''
+    [INFO] After filtering for 
+        (1) training convergence; 
+        (2) gene of interest ({len(genes_of_interest)}/{num_total_genes} specified); 
+        (3) min amplicons per gene = {args.min_num_amps_per_gene}
+    Using {len(curr_selected_amplicons)} / {num_total_amplicons} amplicons.
+        ''')
+
     df_observed_read_counts = df_tsv[curr_selected_amplicons]
     cell_total_read_counts = df_tsv.sum(axis = 1)
     
@@ -285,7 +304,7 @@ def main(args):
 
     seed_list = np.random.permutation(np.arange(100))[:nrestarts]
     for restart_idx in range(nrestarts):
-        inferred_mixing_props, inferred_cn_profiles, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_selected_amplicons, cell_total_read_counts, genelist, nclones=nclones, cn_max = maxcn, seed=seed_list[restart_idx], init_guess_maxcn=init_maxcn)
+        inferred_mixing_props, inferred_cn_profiles, df_EM = mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplicon_params, cell_total_read_counts, filtered_genelist, nclones=nclones, cn_max = maxcn, seed=seed_list[restart_idx], init_guess_maxcn=init_maxcn)
         
         curr_max_marginal = df_EM.iloc[-1]['marginal']
         
@@ -315,7 +334,7 @@ def main(args):
     with open(f'{prefix}_clone_info.csv', 'w') as out:
         out.write('clone_idx,gene,cn,prop\n')
         for clone_idx in range(nclones):
-            for gene_idx, gene in enumerate(genelist):
+            for gene_idx, gene in enumerate(filtered_genelist):
                 out.write(f'{clone_idx},{gene},{final_cn_profiles[clone_idx][gene_idx]},{final_mixing_props[clone_idx]}\n')
     
     # df_clone_info = pd.DataFrame({'clone_id': list(np.arange(nclones)),
@@ -326,7 +345,7 @@ def main(args):
     final_df_EM.to_csv(f'{prefix}_EM_info.csv', index=False)
     
     with open(f'{prefix}_genelist.txt', 'w') as out:
-        for gene in genelist:
+        for gene in filtered_genelist:
             out.write(f'{gene}\n')
 
 if __name__ == "__main__":
@@ -347,6 +366,9 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, help='seed', default=0)
     parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)    
     parser.add_argument('--init_maxcn', type=int, help='limit the maximum possible copy number for the initial guess', default=3) 
+    # @HZ 04/03/2023: add option to specify genes to use
+    parser.add_argument('--genes_of_interest', nargs="*", help='genes to use', default=None)
+    parser.add_argument('--min_num_amps_per_gene', type=int, help='minimum number of amplicons per gene to use', default=1)
     parser.add_argument('--prefix', type=str, help='prefix for output files')
 
     args = parser.parse_args(None if sys.argv[1:] else ['-h'])

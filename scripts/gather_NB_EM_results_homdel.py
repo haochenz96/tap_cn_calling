@@ -187,6 +187,11 @@ def main(args):
     try:
         solution_clone_info_f = glob.glob(str(inputs_dir / f'{sample_name}*nclones={nclones}*seed={seed}*clone_info.csv'))[0]
         solution_homdel_profiles = glob.glob(str(inputs_dir / f'{sample_name}*nclones={nclones}*seed={seed}*homdel_profiles.csv'))[0]
+
+        shutil.copyfile(
+            EM_results_fs[best_idx], 
+            f'{output_prefix}_solution.EM_info.csv'
+        )
     except Exception as e:
         print(e)
         print(f'[ERROR] no solution found for seed = {seed}, nclones = {nclones}')

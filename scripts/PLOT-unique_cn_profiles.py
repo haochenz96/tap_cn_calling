@@ -69,6 +69,18 @@ def main(args):
     assert 'clone_id' in sample_sc_clone_assignment_df.columns, '[WARNING] sample_sc_clone_assignment_df must have "clone_id" column'
     sample_sc_clone_assignment_df.columns = ['sample', 'cell_barcode', 'clone_id']
 
+    # _____process input_____
+    # --> 0. need to make sure the amplicons are unique
+    rename_chrX_map = {'X': '23', 'chrX': '23', }
+    amp_gene_map_df['chr_num'] = amp_gene_map_df[CHROM_COL_NAME].map(lambda x: x if x not in rename_chrX_map else rename_chrX_map[x]).str.strip('chr').astype(int)
+    # embed()
+    amp_gene_map_df.sort_values(by=['chr_num', 'insert_start'], inplace=True)
+    amp_gene_map_df.drop_duplicates(subset=['chr_num', 'insert_start'], keep='first', inplace=True)
+    print(f'after removing duplicated amplicons, {amp_gene_map_df.shape[0]} amplicons remain')
+    unique_amplicon_order = amp_gene_map_df.index.values
+    gene_names = amp_gene_map_df.loc[unique_amplicon_order, GENE_COL_NAME].values
+    gene_names_to_plot = pd.Series(gene_names).value_counts()[pd.Series(gene_names).value_counts() >= 3].index # plot gene names covered by at least 3 amplicons
+
     # --> 1. remove duplicated clones
     # by design, clones with identical CN profiles should not be in sample_sc_clone_assignment_df, but if they do, we remove them:
     duplicated_clones = []
@@ -85,22 +97,24 @@ def main(args):
                 print(f'[WARNING] {cluster_i} and {cluster_j} are identical')
                 duplicated_clones.append(cluster_j)
                 sample_sc_clone_assignment_df.loc[sample_sc_clone_assignment_df['clone_id'] == cluster_j, 'clone_id'] = cluster_i
-    # --> 2. remove nonexistant clones
-    # if a clone is not in sample_sc_clone_assignment_df, remove it from cn_clone_profiles_df
-    nonexistant_clones = []
-    for cluster_i in cn_clone_profiles_df.index.unique():
-        if cluster_i in duplicated_clones:
-            continue
-        if cluster_i not in sample_sc_clone_assignment_df['clone_id'].unique():
-            nonexistant_clones.append(cluster_i)
-    logging.info(f'nonexistant_clones: {nonexistant_clones}')
-    print(f'[WARNING] nonexistant_clones: {nonexistant_clones}')
+    # # --> 2. remove nonexistant clones
+    # # if a clone is not in sample_sc_clone_assignment_df, remove it from cn_clone_profiles_df
+    # nonexistant_clones = []
+    # for cluster_i in cn_clone_profiles_df.index.unique():
+    #     if cluster_i in duplicated_clones:
+    #         continue
+    #     if cluster_i not in sample_sc_clone_assignment_df['clone_id'].unique():
+    #         nonexistant_clones.append(cluster_i)
+    # logging.info(f'nonexistant_clones: {nonexistant_clones}')
+    # print(f'[WARNING] nonexistant_clones: {nonexistant_clones}')
 
-    clones_to_remove = duplicated_clones + nonexistant_clones
+    clones_to_remove = duplicated_clones # + nonexistant_clones
     unique_cn_clone_profiles_df = cn_clone_profiles_df.drop(clones_to_remove, axis=0) # delete cluster_j's in cn_clone_profiles_df
 
-    # move last row, which is by design the normal, diploid clone, to the top
-    unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.iloc[-1:].append(unique_cn_clone_profiles_df.iloc[:-1])
+    # move the row with all 2's to the top
+    # print((unique_cn_clone_profiles_df == 2).sum(axis=1).idxmax())
+    diploid_clone_id = (unique_cn_clone_profiles_df == 2).sum(axis=1).idxmax()
+    unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.loc[[diploid_clone_id] + [x for x in unique_cn_clone_profiles_df.index if x != diploid_clone_id]]
         
     # @HZ 03/20/2023: rename the clones for simplicity
     cluster_rename_map = dict(zip(
@@ -133,13 +147,6 @@ def main(args):
     cn_clone_palette = dict(zip(cluster_labels, np.array(px.colors.qualitative.Set3)[cluster_labels]))
     cluster_colors = [cn_clone_palette[i] for i in cluster_labels]
 
-    # embed()
-
-    # gene names to label
-    amplicon_order = amp_gene_map_df.index.values
-    gene_names = amp_gene_map_df[GENE_COL_NAME].values
-    gene_names_to_plot = pd.Series(gene_names).value_counts()[pd.Series(gene_names).value_counts() >= 3].index # plot gene names covered by at least 3 amplicons
-
     ###########  ----- CN cluster profiles -----  ################
     # draw subplots
     fig = make_subplots(
@@ -167,6 +174,7 @@ def main(args):
     fig.layout.yaxis3.tickvals = np.arange(unique_cn_clone_profiles_df.shape[0])
 
     # Draw gene names
+    # embed()
     un_genes, idx_genes, inv_genes, cnts_genes = np.unique(gene_names, return_index=True, return_inverse=True, return_counts=True)
     gene_col_binary = [0]
     for i in np.arange(1,len(inv_genes)):
@@ -214,7 +222,7 @@ def main(args):
     fig.update_layout({'xaxis2': {'ticklen': 4, 'side': 'top', 'tickangle': -60, 'showticklabels': True}})
 
     # draw chromosome numbers
-    chromosome_ordered = amp_gene_map_df.loc[amplicon_order, CHROM_COL_NAME].values
+    chromosome_ordered = amp_gene_map_df.loc[unique_amplicon_order, CHROM_COL_NAME].values
     un, ind, cnts = np.unique(chromosome_ordered, return_index=True, return_counts=True)
     ticks = (ind + cnts / 2).astype(int)
 
@@ -397,6 +405,7 @@ if __name__ == "__main__":
     parser.add_argument('--amp_gene_map_f', type=str, required=True, help = 'CSV/TSV file with amplicon IDs in the first column. Required columns: `chr` and `gene`. Please make sure the amplicon IDs are ordered by genomic coordinates for best plotting results.')
     parser.add_argument('--cn_clone_profiles_csv', type=str, help='amplicon-level CN clone profile', required=True)
     parser.add_argument('--sample_sc_clone_assignment_csv', type=str, help='df assigning each sample, each single cell to each CN cluster. Therefore the 3 columns, in order, must be `sample_name`, `single-cell ID`, `clone_id`. Only the `clone_id` column needs to be named.', required=True)
+    parser.add_argument('--clone_prev_threshold', type=float, help='do not shoe profile of CN clone smaller than this cell prevalence', default=0.01)
     parser.add_argument('--output_dir', type=str, help='output directory', required=True)
     parser.add_argument('--output_f_prefix', type=str, help='output file prefix', default='')
     parser.add_argument('--plot_homdel', type=bool, help='for genes likely affected by homdel, plot distribution of all its amplicons', default=False)

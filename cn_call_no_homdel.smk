@@ -73,6 +73,7 @@ rule cn_calling_panel_level_no_homdel:
         amplicon_df = config['panel_amplicon_parameters'],
         maxcn = config['panel_maxcn'],
         init_maxcn = config['init_maxcn'],
+        min_num_amps_per_gene = config['min_num_amps_per_gene'] if 'min_num_amps_per_gene' in config else 1,
     log:
         std = 'cn_call_no_homdel/intermediate_results/std/{cohort_name}_nclones={nclones}_seed={seed}.log',
         err = 'cn_call_no_homdel/intermediate_results/std/{cohort_name}_nclones={nclones}_seed={seed}.err.log',
@@ -98,6 +99,7 @@ rule cn_calling_panel_level_no_homdel:
             --prefix {params.prefix} \
             --maxcn {params.maxcn} \
             --init_maxcn {params.init_maxcn} \
+            --min_num_amps_per_gene {params.min_num_amps_per_gene} \
             1> {log.std} 2> {log.err}
         '''
 
