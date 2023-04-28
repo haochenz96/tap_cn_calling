@@ -81,10 +81,10 @@ def main(args):
     gene_names = amp_gene_map_df.loc[unique_amplicon_order, GENE_COL_NAME].values
     gene_names_to_plot = pd.Series(gene_names).value_counts()[pd.Series(gene_names).value_counts() >= 3].index # plot gene names covered by at least 3 amplicons
 
-    # --> 1. remove duplicated clones
+    # --> 1. find duplicated clones
     # by design, clones with identical CN profiles should not be in sample_sc_clone_assignment_df, but if they do, we remove them:
     duplicated_clones = []
-    
+    # ______ swap out the duplicated clones in sample_sc_clone_assignment_df ______
     for cluster_i in cn_clone_profiles_df.index.unique():
         if cluster_i in duplicated_clones:
             continue
@@ -108,19 +108,36 @@ def main(args):
     # logging.info(f'nonexistant_clones: {nonexistant_clones}')
     # print(f'[WARNING] nonexistant_clones: {nonexistant_clones}')
 
-    clones_to_remove = duplicated_clones # + nonexistant_clones
+    # --> 3. find clones too small
+    clone_prev_vc = sample_sc_clone_assignment_df['clone_id'].value_counts()
+    total_cells = clone_prev_vc.sum()
+
+    threshold = args.clone_prev_threshold
+    # too_small_clones = clone_prev_vc[clone_prev_vc < 0.01*total_cells].index.tolist()
+    smaller_clones = clone_prev_vc.index.get_level_values(0)[clone_prev_vc <= 0.01*total_cells].tolist()
+    print(f'[WARNING] removing smaller_clones (<= {threshold} single-cell prevalence): {smaller_clones}')
+
+    # --> 4. remove the smaller clone and duplicated clones from cn_clone_profiles_df
+    clones_to_remove = set(duplicated_clones + smaller_clones) # + nonexistant_clones
     unique_cn_clone_profiles_df = cn_clone_profiles_df.drop(clones_to_remove, axis=0) # delete cluster_j's in cn_clone_profiles_df
 
-    # move the row with all 2's to the top
+    # --> 5. @HZ 03/20/2023: reorder the clones for simplicity
+    # move the row with the most 2's (diploid clone) to the top
     # print((unique_cn_clone_profiles_df == 2).sum(axis=1).idxmax())
     diploid_clone_id = (unique_cn_clone_profiles_df == 2).sum(axis=1).idxmax()
     unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.loc[[diploid_clone_id] + [x for x in unique_cn_clone_profiles_df.index if x != diploid_clone_id]]
-        
-    # @HZ 03/20/2023: rename the clones for simplicity
+
+    # --> 6. swap out the smaller clones to diploid in the sc assignment df
+    clone_swap_map = {i: diploid_clone_id for i in smaller_clones} 
+    clone_swap_map.update({i: i for i in set(sample_sc_clone_assignment_df['clone_id']) - set(smaller_clones)})
+    sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(clone_swap_map).astype(int)
+
     cluster_rename_map = dict(zip(
         unique_cn_clone_profiles_df.index, 
         np.arange(unique_cn_clone_profiles_df.shape[0]))
         )
+
+    # embed()
     sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(cluster_rename_map)
     sample_sc_clone_assignment_df.to_csv(
         output_dir / f'{cohort_name}{output_f_prefix}.sample_sc_clone_assignment.updated.csv',
@@ -318,8 +335,9 @@ def main(args):
             # _____ read from YAML _____
             with open(cn_call_yaml, 'r') as f:
                 cn_call_config = yaml.safe_load(f)
-            sample_names = list(cn_call_config['tsv_file_dict'].keys())
-            rc_tsvs = list(cn_call_config['tsv_file_dict'].values())
+            # sample_names = list(cn_call_config['tsv_file_dict'].keys())
+            sample_names = sample_sc_clone_assignment_df['sample'].unique().tolist()
+            rc_tsvs = [cn_call_config['tsv_file_dict'][sample_name] for sample_name in sample_names]
             amp_params_df = pd.read_csv(
                 cn_call_config['panel_amplicon_parameters'],
                 index_col= 0,
@@ -380,7 +398,7 @@ def main(args):
                     y = 'read_counts',
                     color = 'cn_cluster',
                     color_discrete_map = cn_clone_palette,
-                    points = False
+                    points = False,
                 )
                 rc_box_plots[gene_i].update_yaxes(
                     title_text = 'normalized read counts',
