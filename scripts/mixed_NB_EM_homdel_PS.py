@@ -10,7 +10,7 @@ from scipy.special import logsumexp
 
 # @HZ: 01-23-2023:
 # PS homdel method
-zero_cn_mean = 0.1
+zero_cn_mean = 0.2 # @HZ 06/13/2023 updated from 0.1 to 0.2
 
 def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicon_params, cell_total_reads, genelist, mixing_props, cn_profiles, homdel_profiles):
     '''
@@ -418,9 +418,9 @@ def main(args):
     if args.start_from_best_sol == 'yes':
         try:
             df_predefined_cn_clone_info = pd.read_csv(args.predefined_cn_clone_info, header=0, index_col=None)
-            # -- the clone_profiles numpy array need to be clone_idx by gene_idx; and the genes need to be in the same order as the filtered_gene_list
+            # -- the clone_profiles numpy array need to be clone_idx by gene_idx; and the genes need to be in the same order as the filtered_genelist
             df_wide_solution_clone_info = df_predefined_cn_clone_info.pivot(index=['clone_idx','prop'], columns='gene', values='cn').reset_index()
-            array_predefined_cn_profiles = df_wide_solution_clone_info.loc[:, filtered_gene_list].values
+            array_predefined_cn_profiles = df_wide_solution_clone_info.loc[:, filtered_genelist].values
             # -- the clone_props needs to be an ordered list of clone_prop of each CN clone
             array_clone_props = df_wide_solution_clone_info.loc[:, ['prop']].values
         except Exception as e:
@@ -445,13 +445,13 @@ def main(args):
                 df_observed_read_counts, 
                 df_amplicon_params, 
                 cell_total_read_counts, 
-                filtered_gene_list, 
+                filtered_genelist, 
                 nclones=nclones, 
                 cn_max = maxcn, 
-                seed=seed_list[restart_idx], predefined_cn_clone_info=array_predefined_cn_profiles, predefined_cn_clone_props=array_clone_props, init_maxcn=init_maxcn
+                seed=seed_list[restart_idx], predefined_cn_clone_info=array_predefined_cn_profiles,predefined_cn_clone_props=array_clone_props, init_maxcn=init_maxcn
                 )
         except:
-            embed()
+            # embed()
             sys.exit(1)
         
         curr_max_marginal = df_EM.iloc[-1]['marginal']
@@ -482,7 +482,7 @@ def main(args):
     with open(f'{prefix}.clone_info.csv', 'w') as out:
         out.write('clone_idx,gene,cn,prop\n')
         for clone_idx in range(nclones):
-            for gene_idx, gene in enumerate(filtered_gene_list):
+            for gene_idx, gene in enumerate(filtered_genelist):
                 out.write(f'{clone_idx},{gene},{final_cn_profiles[clone_idx][gene_idx]},{final_mixing_props[clone_idx]}\n')
     
     pd.DataFrame(homdel_profiles, index = range(nclones), columns=df_observed_read_counts.columns).to_csv(f'{prefix}.homdel_profiles.csv', index=True)
@@ -490,8 +490,8 @@ def main(args):
     
     final_df_EM.to_csv(f'{prefix}.EM_info.csv', index=False)
     
-    # with open(f'{prefix}_filtered_gene_list.txt', 'w') as out:
-    #     for gene in filtered_gene_list:
+    # with open(f'{prefix}_filtered_genelist.txt', 'w') as out:
+    #     for gene in filtered_genelist:
     #         out.write(f'{gene}\n')
 
 if __name__ == "__main__":

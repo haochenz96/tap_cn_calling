@@ -75,8 +75,8 @@ rule cn_calling_panel_level_no_homdel:
         init_maxcn = config['init_maxcn'],
         min_num_amps_per_gene = config['min_num_amps_per_gene'] if 'min_num_amps_per_gene' in config else 1,
     log:
-        std = 'cn_call_no_homdel/intermediate_results/std/{cohort_name}_nclones={nclones}_seed={seed}.log',
-        err = 'cn_call_no_homdel/intermediate_results/std/{cohort_name}_nclones={nclones}_seed={seed}.err.log',
+        std = 'cn_call_no_homdel/intermediate_results/std/call/{cohort_name}_nclones={nclones}_seed={seed}.log',
+        err = 'cn_call_no_homdel/intermediate_results/std/call/{cohort_name}_nclones={nclones}_seed={seed}.err.log',
     conda: 
         "envs/sc_cn_calling.yaml",
     group: "cn_calling-no_homdel"
@@ -122,8 +122,8 @@ rule gather_NB_EM_results_no_homdel:
         prefix = 'cn_call_no_homdel/solutions/{cohort_name}_nclones={nclones}',
         amplicon_parameters_f = config['panel_amplicon_parameters'],
     log:
-        std = 'cn_call_no_homdel/std/gather_NB_EM_results-{cohort_name}_nclones={nclones}.log',
-        err = 'cn_call_no_homdel/std/gather_NB_EM_results-{cohort_name}_nclones={nclones}.err.log',
+        std = 'cn_call_no_homdel/std/gather/gather_NB_EM_results-{cohort_name}_nclones={nclones}.log',
+        err = 'cn_call_no_homdel/std/gather/gather_NB_EM_results-{cohort_name}_nclones={nclones}.err.log',
     conda: 
         "envs/sc_cn_calling.yaml",
     group: 'gather_cn_call_no_homdel'

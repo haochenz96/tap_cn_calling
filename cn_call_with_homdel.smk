@@ -11,7 +11,7 @@ sample_names = config['samples']
 run_suffix = config['run_suffix']
 cn_calling_mode = config['cn_calling_mode'] 
 
-#################
+################# homdel snake-specific params #################
 if config['start_from_best_sol'] == 'yes':
     # @HZ 03/13/2023: next, run with homdel, starting from the best solution without homdel
     # scatter by nclones, seed
@@ -69,22 +69,24 @@ rule cn_calling_panel_level_with_homdel:
     output:
         result_homdel_profiles = 'cn_call_with_homdel/intermediate_results/{cohort_name}-homdel-nclones={nclones}_seed={seed}.homdel_profiles.csv',
     params:
+        # ----- homdel params -----
         cn_call_with_homdel_script = config['scripts']['cn_calling_panel_level_with_homdel'],
         start_from_best_sol = config['start_from_best_sol'],
         no_homdel_nclones_clone_info = no_homdel_nclones_clone_info, # None if start from scratch
         output_prefix = 'cn_call_with_homdel/intermediate_results/{cohort_name}-homdel-nclones={nclones}_seed={seed}',
         seed = lambda wildcards: wildcards.seed,
-        maxcn = config['panel_maxcn'] if 'panel_maxcn' in config else 8, # default to 8
-        init_maxcn = config['init_maxcn'] if 'init_maxcn' in config else 3, # default to 3
-        # common params
+        # ----- common params -----
         cn_calling_mode = config['cn_calling_mode'],
         cohort_name = cohort_name,
         sample_names = sample_names,
         amplicon_df = config['panel_amplicon_parameters'],
         nclones = lambda wildcards: wildcards.nclones,
+        maxcn = config['panel_maxcn'] if 'panel_maxcn' in config else 8, # default to 8
+        init_maxcn = config['init_maxcn'] if 'init_maxcn' in config else 3, # default to 3
+        min_num_amps_per_gene = config['min_num_amps_per_gene'] if 'min_num_amps_per_gene' in config else 1,
     log:
-        std = 'cn_call_with_homdel/std/{cohort_name}-homdel-nclones={nclones}_seed={seed}.call.log',
-        err = 'cn_call_with_homdel/std/{cohort_name}-homdel-nclones={nclones}_seed={seed}.call.err.log',
+        std = 'cn_call_with_homdel/std/call/{cohort_name}-homdel-nclones={nclones}_seed={seed}.call.log',
+        err = 'cn_call_with_homdel/std/call/{cohort_name}-homdel-nclones={nclones}_seed={seed}.call.err.log',
     conda: 
         "envs/sc_cn_calling.yaml",
     threads: lambda wildcards, attempt: attempt * 4
@@ -107,6 +109,7 @@ rule cn_calling_panel_level_with_homdel:
             --init_maxcn {params.init_maxcn} \
             --seed {params.seed} \
             --prefix {params.output_prefix} \
+            --min_num_amps_per_gene {params.min_num_amps_per_gene} \
             1> {log.std} 2> {log.err}        
         '''
         
@@ -129,8 +132,8 @@ rule gather_NB_EM_results_with_homdel:
         amplicon_df = config['panel_amplicon_parameters'],
         nclones = lambda wildcards: wildcards.nclones,
     log:
-        std = 'cn_call_with_homdel/std/{cohort_name}-homdel-nclones={nclones}.gather.log',
-        err = 'cn_call_with_homdel/std/{cohort_name}-homdel-nclones={nclones}.gather.err.log',
+        std = 'cn_call_with_homdel/std/gather/{cohort_name}-homdel-nclones={nclones}.gather.log',
+        err = 'cn_call_with_homdel/std/gather/{cohort_name}-homdel-nclones={nclones}.gather.err.log',
     conda: 
         "envs/sc_cn_calling.yaml",
     threads: lambda wildcards, attempt: attempt * 4
@@ -167,6 +170,9 @@ rule plot_cn_clone_profiles_compositions:
         # common params
         cohort_name = cohort_name,
         sample_names = sample_names,
+    log:
+        std = 'cn_call_with_homdel/std/plot/{cohort_name}-homdel-nclones={nclones}.plot.log',
+        err = 'cn_call_with_homdel/std/plot/{cohort_name}-homdel-nclones={nclones}.plot.err.log',
     conda: 
         "envs/mosaic-custom.yaml",
     shell:
@@ -177,7 +183,8 @@ rule plot_cn_clone_profiles_compositions:
             --cn_clone_profiles_csv {input.solution_clone_profiles} \
             --sample_sc_clone_assignment_csv {input.solution_sc_assignments} \
             --output_dir {params.output_dir} \
-            --output_f_prefix {params.output_f_prefix} 
+            --output_f_prefix {params.output_f_prefix} \
+            1> {log.std} 2> {log.err}
         '''
 
 checkpoint get_best_nclones:
