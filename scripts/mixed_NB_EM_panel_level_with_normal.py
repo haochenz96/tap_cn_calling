@@ -231,12 +231,15 @@ def main(args):
     np.random.seed(args.seed)
     
     # prepare the input data
+    cohort_name = args.cohort_name
     cn_calling_mode = args.cn_calling_mode
+    
     if cn_calling_mode not in ['single-sample', 'cohort']:
         print('Error: cn_calling_mode must be either single-sample or cohort')
         exit(1)
     elif cn_calling_mode == 'single-sample':
-        sample_name = args.sample_name
+        sample_name = args.sample_name[0]
+        print(sample_name)
         if type(sample_name) != str:
             raise ValueError('for single-sample mode, sample_name must be a string')
             exit(1)
@@ -244,7 +247,7 @@ def main(args):
         df_tsv = pd.read_csv(args.readcounts, sep='\t', index_col = 0)
     else: # cn_calling_mode == ‘cohort’
         sample_names = args.sample_name
-        cohort_name = args.cohort_name
+        
         print(sample_names)
         print(len(args.readcounts))
         if type(sample_names) != list:

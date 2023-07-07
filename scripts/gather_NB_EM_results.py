@@ -55,12 +55,12 @@ def main(args):
         print('Error: cn_calling_mode must be either single-sample or cohort')
         exit(1)
     elif cn_calling_mode == 'single-sample':
-        sample_name = args.sample_name
+        sample_name = args.sample_name[0]
         if type(sample_name) != str:
             raise ValueError('for single-sample mode, sample_name must be a string')
             exit(1)
 
-        df_tsv = pd.read_csv(args.readcounts, sep='\t', index_col = 0)
+        df_tsv = pd.read_csv(args.readcounts[0], sep='\t', index_col = 0)
     else:
         sample_name = args.cohort_name
         sample_names = args.sample_name
