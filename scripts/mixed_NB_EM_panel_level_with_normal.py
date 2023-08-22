@@ -240,7 +240,7 @@ def main(args):
     elif cn_calling_mode == 'single-sample':
         sample_name = args.sample_name[0]
         print(sample_name)
-        if type(sample_name) != str:
+        if type(sample_name) != str or type(args.readcounts) != str:
             raise ValueError('for single-sample mode, sample_name must be a string')
             exit(1)
 
@@ -248,8 +248,8 @@ def main(args):
     else: # cn_calling_mode == ‘cohort’
         sample_names = args.sample_name
         
-        print(sample_names)
-        print(len(args.readcounts))
+        print(f"[INFO] processing multiple samples: {sample_names}")
+        # print(len(args.readcounts))
         if type(sample_names) != list:
             raise ValueError('for cohort mode, sample_names must be a list')
             exit(1)
