@@ -160,9 +160,10 @@ def main(args):
     # cluster_labels = np.arange(unique_cn_clone_profiles_df.shape[0])
     cluster_labels = unique_cn_clone_profiles_df.index.values
     logging.info(f"identified {len(cluster_labels)} unique clones")
-    if len(cluster_labels) == 0:
+    if len(cluster_labels) == 1:
         logging.warning(f"no tumor clone left after filtering, exiting...")
-        sys.exit()
+        # sys.exit(0) #@HZ this seems to cause Snakemake to think there's an error
+        return
     # embed()
     cn_clone_palette = dict(zip(cluster_labels, np.array(px.colors.qualitative.Set3)[cluster_labels]))
     cluster_colors = [cn_clone_palette[i] for i in cluster_labels]

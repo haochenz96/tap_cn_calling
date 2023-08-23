@@ -51,7 +51,7 @@ workdir: working_dir
 rule pass2_outputs:
     input:
         expand(
-            'cn_call_with_homdel/outputs/{cohort_name}_homdel_nclones={nclones}.sample_CN-cluster_composition.png',
+            'cn_call_with_homdel/outputs/{cohort_name}_homdel_nclones={nclones}.unique_cn_clone_profiles.csv',
             cohort_name = cohort_name,
             nclones = nclones,
         ),
@@ -160,8 +160,9 @@ rule plot_cn_clone_profiles_compositions:
         solution_clone_profiles = 'cn_call_with_homdel/solutions/{cohort_name}-homdel-nclones={nclones}_solution.amp_clone_profiles.csv',   
         solution_sc_assignments = 'cn_call_with_homdel/solutions/{cohort_name}-homdel-nclones={nclones}_solution.cell_assignments.csv',     
     output:
-        solution_clone_profiles_plot = 'cn_call_with_homdel/outputs/{cohort_name}_homdel_nclones={nclones}.cn_clone_profiles.png',
-        result_clone_compo_plot = 'cn_call_with_homdel/outputs/{cohort_name}_homdel_nclones={nclones}.sample_CN-cluster_composition.png',
+        # solution_clone_profiles_plot = 'cn_call_with_homdel/outputs/{cohort_name}_homdel_nclones={nclones}.cn_clone_profiles.png',
+        # result_clone_compo_plot = 'cn_call_with_homdel/outputs/{cohort_name}_homdel_nclones={nclones}.sample_CN-cluster_composition.png',
+        unique_clone_profiles_csv = 'cn_call_with_homdel/outputs/{cohort_name}_homdel_nclones={nclones}.unique_cn_clone_profiles.csv',
     params:
         plot_cn_clone_profiles_script = config['scripts']['plot_cn_clone_profiles'],
         amp_gene_map_f = config['amplicon_gene_map_f'],
