@@ -12,7 +12,7 @@ import numpy as np
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import plotly.express as px
-import yaml
+import yaml, json
 
 from IPython import embed
 
@@ -97,16 +97,16 @@ def main(args):
                 print(f'[WARNING] {cluster_i} and {cluster_j} are identical')
                 duplicated_clones.append(cluster_j)
                 sample_sc_clone_assignment_df.loc[sample_sc_clone_assignment_df['clone_id'] == cluster_j, 'clone_id'] = cluster_i
-    # # --> 2. remove nonexistant clones
-    # # if a clone is not in sample_sc_clone_assignment_df, remove it from cn_clone_profiles_df
-    # nonexistant_clones = []
-    # for cluster_i in cn_clone_profiles_df.index.unique():
-    #     if cluster_i in duplicated_clones:
-    #         continue
-    #     if cluster_i not in sample_sc_clone_assignment_df['clone_id'].unique():
-    #         nonexistant_clones.append(cluster_i)
-    # logging.info(f'nonexistant_clones: {nonexistant_clones}')
-    # print(f'[WARNING] nonexistant_clones: {nonexistant_clones}')
+    # --> 2. remove nonexistant clones
+    # if a clone is not in sample_sc_clone_assignment_df, remove it from cn_clone_profiles_df
+    nonexistant_clones = []
+    for cluster_i in cn_clone_profiles_df.index.unique():
+        if cluster_i in duplicated_clones:
+            continue
+        if cluster_i not in sample_sc_clone_assignment_df['clone_id'].unique():
+            nonexistant_clones.append(cluster_i)
+    logging.info(f'nonexistant_clones: {nonexistant_clones}')
+    print(f'[WARNING] nonexistant_clones: {nonexistant_clones}')
 
     # --> 3. find clones too small
     clone_prev_vc = sample_sc_clone_assignment_df['clone_id'].value_counts()
@@ -118,7 +118,8 @@ def main(args):
     print(f'[WARNING] removing smaller_clones (<= {threshold} single-cell prevalence): {smaller_clones}')
 
     # --> 4. remove the smaller clone and duplicated clones from cn_clone_profiles_df
-    clones_to_remove = set(duplicated_clones + smaller_clones) # + nonexistant_clones
+    clones_to_remove = set(duplicated_clones + smaller_clones + nonexistant_clones)
+    
     unique_cn_clone_profiles_df = cn_clone_profiles_df.drop(clones_to_remove, axis=0) # delete cluster_j's in cn_clone_profiles_df
 
     # --> 5. @HZ 03/20/2023: reorder the clones for simplicity
@@ -136,6 +137,13 @@ def main(args):
         unique_cn_clone_profiles_df.index, 
         np.arange(unique_cn_clone_profiles_df.shape[0]))
         )
+    # if required, write the cluster_rename_map to a JSON
+    if args.write_cluster_rename_map_json:
+        # convert everything from numpy int64 to python int
+        cluster_rename_map = {int(k): int(v) for k,v in cluster_rename_map.items()}
+        with open(output_dir / f'{cohort_name}{output_f_prefix}.cluster_rename_map.json','w') as f:
+            json_object = json.dumps(cluster_rename_map)
+            f.write(json_object)
 
     # embed()
     sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(cluster_rename_map)
@@ -433,6 +441,7 @@ if __name__ == "__main__":
     parser.add_argument('--plot_homdel', type=bool, help='for genes likely affected by homdel, plot distribution of all its amplicons', default=False)
     parser.add_argument('--homdel_genes_oi', type = str, nargs='+', help = 'genes of interest for plotting homdel amplicon distributions', default = None)
     parser.add_argument('--cn_call_yaml', type=str, help='Required when plotting raw rc distribution. YAML file for this cn-call run', default=None)
+    parser.add_argument('--write_cluster_rename_map_json', type=bool, help='whether to write the cluster_rename_map', default=False)
     parser.add_argument('--log_file', type=str, default=None)
 
 
