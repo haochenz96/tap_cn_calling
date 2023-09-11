@@ -81,77 +81,79 @@ def main(args):
     gene_names = amp_gene_map_df.loc[unique_amplicon_order, GENE_COL_NAME].values
     gene_names_to_plot = pd.Series(gene_names).value_counts()[pd.Series(gene_names).value_counts() >= 3].index # plot gene names covered by at least 3 amplicons
 
-    # --> 1. find duplicated clones
-    # by design, clones with identical CN profiles should not be in sample_sc_clone_assignment_df, but if they do, we remove them:
-    duplicated_clones = []
-    # ______ swap out the duplicated clones in sample_sc_clone_assignment_df ______
-    for cluster_i in cn_clone_profiles_df.index.unique():
-        if cluster_i in duplicated_clones:
-            continue
-        for cluster_j in cn_clone_profiles_df.index.unique():
-            if cluster_i == cluster_j:
+    if args.clone_cleanup:
+        # --> 1. find duplicated clones
+        # by design, clones with identical CN profiles should not be in sample_sc_clone_assignment_df, but if they do, we remove them:
+        duplicated_clones = []
+        # ______ swap out the duplicated clones in sample_sc_clone_assignment_df ______
+        for cluster_i in cn_clone_profiles_df.index.unique():
+            if cluster_i in duplicated_clones:
                 continue
-            if (cn_clone_profiles_df.loc[cluster_i] == cn_clone_profiles_df.loc[cluster_j]).all():
-                # in the sample_sc_clone_assignment_df, replace cluster_j with cluster_i
-                logging.info(f'{cluster_i} and {cluster_j} are identical')
-                print(f'[WARNING] {cluster_i} and {cluster_j} are identical')
-                duplicated_clones.append(cluster_j)
-                sample_sc_clone_assignment_df.loc[sample_sc_clone_assignment_df['clone_id'] == cluster_j, 'clone_id'] = cluster_i
-    # # --> 2. remove nonexistant clones
-    # # if a clone is not in sample_sc_clone_assignment_df, remove it from cn_clone_profiles_df
-    # nonexistant_clones = []
-    # for cluster_i in cn_clone_profiles_df.index.unique():
-    #     if cluster_i in duplicated_clones:
-    #         continue
-    #     if cluster_i not in sample_sc_clone_assignment_df['clone_id'].unique():
-    #         nonexistant_clones.append(cluster_i)
-    # logging.info(f'nonexistant_clones: {nonexistant_clones}')
-    # print(f'[WARNING] nonexistant_clones: {nonexistant_clones}')
+            for cluster_j in cn_clone_profiles_df.index.unique():
+                if cluster_i == cluster_j:
+                    continue
+                if (cn_clone_profiles_df.loc[cluster_i] == cn_clone_profiles_df.loc[cluster_j]).all():
+                    # in the sample_sc_clone_assignment_df, replace cluster_j with cluster_i
+                    logging.info(f'{cluster_i} and {cluster_j} are identical')
+                    print(f'[WARNING] {cluster_i} and {cluster_j} are identical')
+                    duplicated_clones.append(cluster_j)
+                    sample_sc_clone_assignment_df.loc[sample_sc_clone_assignment_df['clone_id'] == cluster_j, 'clone_id'] = cluster_i
+        # # --> 2. remove nonexistant clones
+        # # if a clone is not in sample_sc_clone_assignment_df, remove it from cn_clone_profiles_df
+        # nonexistant_clones = []
+        # for cluster_i in cn_clone_profiles_df.index.unique():
+        #     if cluster_i in duplicated_clones:
+        #         continue
+        #     if cluster_i not in sample_sc_clone_assignment_df['clone_id'].unique():
+        #         nonexistant_clones.append(cluster_i)
+        # logging.info(f'nonexistant_clones: {nonexistant_clones}')
+        # print(f'[WARNING] nonexistant_clones: {nonexistant_clones}')
 
-    # --> 3. find clones too small
-    clone_prev_vc = sample_sc_clone_assignment_df['clone_id'].value_counts()
-    total_cells = clone_prev_vc.sum()
+        # --> 3. find clones too small
+        clone_prev_vc = sample_sc_clone_assignment_df['clone_id'].value_counts()
+        total_cells = clone_prev_vc.sum()
 
-    threshold = args.clone_prev_threshold
-    # too_small_clones = clone_prev_vc[clone_prev_vc < 0.01*total_cells].index.tolist()
-    smaller_clones = clone_prev_vc.index.get_level_values(0)[clone_prev_vc <= 0.01*total_cells].tolist()
-    print(f'[WARNING] removing smaller_clones (<= {threshold} single-cell prevalence): {smaller_clones}')
+        threshold = args.clone_prev_threshold
+        # too_small_clones = clone_prev_vc[clone_prev_vc < 0.01*total_cells].index.tolist()
+        smaller_clones = clone_prev_vc.index.get_level_values(0)[clone_prev_vc <= 0.01*total_cells].tolist()
+        print(f'[WARNING] removing smaller_clones (<= {threshold} single-cell prevalence): {smaller_clones}')
 
-    # --> 4. remove the smaller clone and duplicated clones from cn_clone_profiles_df
-    clones_to_remove = set(duplicated_clones + smaller_clones) # + nonexistant_clones
-    unique_cn_clone_profiles_df = cn_clone_profiles_df.drop(clones_to_remove, axis=0) # delete cluster_j's in cn_clone_profiles_df
+        # --> 4. remove the smaller clone and duplicated clones from cn_clone_profiles_df
+        clones_to_remove = set(duplicated_clones + smaller_clones) # + nonexistant_clones
+        unique_cn_clone_profiles_df = cn_clone_profiles_df.drop(clones_to_remove, axis=0) # delete cluster_j's in cn_clone_profiles_df
 
-    # --> 5. @HZ 03/20/2023: reorder the clones for simplicity
-    # move the row with the most 2's (diploid clone) to the top
-    # print((unique_cn_clone_profiles_df == 2).sum(axis=1).idxmax())
-    diploid_clone_id = (unique_cn_clone_profiles_df == 2).sum(axis=1).idxmax()
-    unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.loc[[diploid_clone_id] + [x for x in unique_cn_clone_profiles_df.index if x != diploid_clone_id]]
+        # --> 5. @HZ 03/20/2023: reorder the clones for simplicity
+        # move the row with the most 2's (diploid clone) to the top
+        # print((unique_cn_clone_profiles_df == 2).sum(axis=1).idxmax())
+        diploid_clone_id = (unique_cn_clone_profiles_df == 2).sum(axis=1).idxmax()
+        unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.loc[[diploid_clone_id] + [x for x in unique_cn_clone_profiles_df.index if x != diploid_clone_id]]
 
-    # --> 6. swap out the smaller clones to diploid in the sc assignment df
-    clone_swap_map = {i: diploid_clone_id for i in smaller_clones} 
-    clone_swap_map.update({i: i for i in set(sample_sc_clone_assignment_df['clone_id']) - set(smaller_clones)})
-    sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(clone_swap_map).astype(int)
+        # --> 6. swap out the smaller clones to diploid in the sc assignment df
+        clone_swap_map = {i: diploid_clone_id for i in smaller_clones} 
+        clone_swap_map.update({i: i for i in set(sample_sc_clone_assignment_df['clone_id']) - set(smaller_clones)})
+        sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(clone_swap_map).astype(int)
 
-    cluster_rename_map = dict(zip(
-        unique_cn_clone_profiles_df.index, 
-        np.arange(unique_cn_clone_profiles_df.shape[0]))
+        cluster_rename_map = dict(zip(
+            unique_cn_clone_profiles_df.index, 
+            np.arange(unique_cn_clone_profiles_df.shape[0]))
+            )
+
+        # embed()
+        sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(cluster_rename_map)
+        sample_sc_clone_assignment_df.to_csv(
+            output_dir / f'{cohort_name}{output_f_prefix}.sample_sc_clone_assignment.updated.csv',
+            index=False, header=True
+        )
+        unique_cn_clone_profiles_df.index = unique_cn_clone_profiles_df.index.map(cluster_rename_map)
+        unique_cn_clone_profiles_df.to_csv(
+            output_dir / f'{cohort_name}{output_f_prefix}.unique_cn_clone_profiles.csv',
+            index=True, header=True
         )
 
-    # embed()
-    sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(cluster_rename_map)
-    sample_sc_clone_assignment_df.to_csv(
-        output_dir / f'{cohort_name}{output_f_prefix}.sample_sc_clone_assignment.updated.csv',
-        index=False, header=True
-    )
-    unique_cn_clone_profiles_df.index = unique_cn_clone_profiles_df.index.map(cluster_rename_map)
-
+    else:
+        unique_cn_clone_profiles_df = cn_clone_profiles_df
     # reset index, fill in non-converged amplicons
     unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.reindex(columns = amp_gene_map_df.index, fill_value=-1)
-    
-    unique_cn_clone_profiles_df.to_csv(
-        output_dir / f'{cohort_name}{output_f_prefix}.unique_cn_clone_profiles.csv',
-        index=True, header=True
-    )
     
     # _____________________
 
@@ -430,6 +432,7 @@ if __name__ == "__main__":
     parser.add_argument('--clone_prev_threshold', type=float, help='do not shoe profile of CN clone smaller than this cell prevalence', default=0.01)
     parser.add_argument('--output_dir', type=str, help='output directory', required=True)
     parser.add_argument('--output_f_prefix', type=str, help='output file prefix', default='')
+    parser.add_argument('--clone_cleanup', type=bool, help='remove duplicated clones and clones with too few cells; rename clones so that the diploid clone is 0', default=True)
     parser.add_argument('--plot_homdel', type=bool, help='for genes likely affected by homdel, plot distribution of all its amplicons', default=False)
     parser.add_argument('--homdel_genes_oi', type = str, nargs='+', help = 'genes of interest for plotting homdel amplicon distributions', default = None)
     parser.add_argument('--cn_call_yaml', type=str, help='Required when plotting raw rc distribution. YAML file for this cn-call run', default=None)
