@@ -20,11 +20,9 @@ from tea.format import isNaN
 from tea.plots import plot_snv_clone
 from pathlib import Path
 
-def get_figure_and_germline_mutations(cravat_df, sample_obj, sample_name, analysis_config, manually_annotated_snvs):
+def get_figure_and_germline_mutations(cravat_df, sample_obj, analysis_config, manually_annotated_snvs):
     num_cells = sample_obj.dna.shape[0]
     
-    print(sample_obj.dna.shape)
-
     snv_selection_params = analysis_config['snv_selection_params']
         
     # 1. mutational prevalence
@@ -200,11 +198,12 @@ def get_figure_and_germline_mutations(cravat_df, sample_obj, sample_name, analys
 
 
 def binarize_NGT_matrix(NGT_df):
-    NGT_df[NGT_df.columns[:-1]] = np.where(NGT_df[NGT_df.columns[:-1]] == 1, 0, NGT_df[NGT_df.columns[:-1]])
-    NGT_df[NGT_df.columns[:-1]] = np.where(NGT_df[NGT_df.columns[:-1]] == 2, 1, NGT_df[NGT_df.columns[:-1]])
+    NGT_df[NGT_df.columns[:-2]] = np.where(NGT_df[NGT_df.columns[:-2]] == 1, 0, NGT_df[NGT_df.columns[:-2]])
+    NGT_df[NGT_df.columns[:-2]] = np.where(NGT_df[NGT_df.columns[:-2]] == 2, 1, NGT_df[NGT_df.columns[:-2]])
+
     return NGT_df
 
-def profile_distance(medians, cell, cell_profile):
+def profile_distance(medians, cell, cell_barcode, cell_profile):
     distances = {}
     for median_clone, median_profile in medians.items():
         mask = median_profile != 3
@@ -212,7 +211,7 @@ def profile_distance(medians, cell, cell_profile):
         mask = np.logical_and(mask, mask2)
         series1 = median_profile[mask]
         series2 = cell_profile[mask]
-        absolute_sum = np.abs(np.sqrt((series1 - series2)**2)).sum()
+        absolute_sum = np.sqrt(((series1 - series2)**2).sum())
         distances[median_clone] = absolute_sum/series2.shape[0]
 
     return distances
@@ -226,7 +225,7 @@ def median_distance(medians, clone1, clone2):
     mask = np.logical_and(mask, mask2)
     series1 = median_profile1[mask]
     series2 = median_profile2[mask]
-    absolute_sum = np.abs(np.sqrt((series1 - series2)**2)).sum()
+    absolute_sum = np.sqrt(((series1 - series2)**2).sum())
     distance = absolute_sum/series2.shape[0]
 
     return distance
@@ -237,7 +236,7 @@ def generate_median_cluster_profiles(NGT_df):
     median_clusters_all = {}
 
     for clone in NGT_df['clone_id'].unique():
-        NGT_curr_clone = NGT_df[NGT_df['clone_id'] == clone][NGT_df.columns[:-1]]
+        NGT_curr_clone = NGT_df[NGT_df['clone_id'] == clone][NGT_df.columns[:-2]]
         if NGT_curr_clone.shape[0] > 0:
             if NGT_curr_clone.mode().squeeze(axis=0).shape[0] == 2 or NGT_curr_clone.mode().squeeze(axis=0).shape[0] == 3:
                 median_clusters_all[clone] = NGT_curr_clone.mode().squeeze(axis=0).iloc[0]
@@ -250,12 +249,10 @@ def generate_median_cluster_profiles(NGT_df):
             else:
                 median_clusters[clone] = NGT_curr_clone.mode().squeeze(axis=0)
 
-
     return median_clusters, median_clusters_all
 
 
 def copy_number_distance(df_tapestri_clones, clone1, clone2):
-    print(clone1, clone2)
     c1_profile = np.array(df_tapestri_clones.loc[clone1].tolist())
     c2_profile = np.array(df_tapestri_clones.loc[clone2].tolist())
     absolute_sum = np.abs(c1_profile - c2_profile).sum()
@@ -269,7 +266,7 @@ def combine_similar_final_clusters(NGT_df, cn_assignment_df, median_clusters, df
     for c1 in NGT_df['clone_id'].unique():
         for c2 in NGT_df['clone_id'].unique():
             if c1 != c2:
-                if median_distance(median_clusters, c1, c2) <= 0.05:
+                if median_distance(median_clusters, c1, c2) <= 0.10:
                     if copy_number_distance(df_tapestri_clones, c1, c2) <= 0.40:
                         c1_size = NGT_curr_clone = NGT_df[NGT_df['clone_id'] == c1][NGT_df.columns[:-1]].shape[0]
                         c2_size = NGT_curr_clone = NGT_df[NGT_df['clone_id'] == c2][NGT_df.columns[:-1]].shape[0]
@@ -293,33 +290,39 @@ def combine_similar_final_clusters(NGT_df, cn_assignment_df, median_clusters, df
 
     return NGT_df, cn_assignment_df, df_tapestri_clones
 
-def merge_large_clusters(NGT_df, cn_assignment_df, median_clusters,  count, sample_name):
+def merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name):
     for clone in NGT_df['clone_id'].unique():
         NGT_curr_clone = NGT_df[NGT_df['clone_id'] == clone][NGT_df.columns[:-1]]
         if NGT_curr_clone.shape[0] > 0.05 * NGT_df.shape[0]:
             for cell, cell_profile in NGT_curr_clone.iterrows():
-                distances = profile_distance(median_clusters, cell, cell_profile)
+                cell_barcode = cell_profile['cell_barcode']
+                cell_profile = cell_profile.drop('cell_barcode')
+                distances = profile_distance(median_clusters, cell, cell_barcode, cell_profile)
                 distances = {k:v/distances[clone] for k,v in distances.items()}
                 k,v = min(distances.items(), key=lambda x: x[1])
                 if v < 0.85:
                     count += 1
-                    cn_assignment_df.loc[(cn_assignment_df.index == sample_name) & (cn_assignment_df['cell_barcode'] == cell), 'clone_id'] = k
-                    NGT_df.loc[cell,'clone_id'] = k
+                    cn_assignment_df.loc[(cn_assignment_df.index == cell) & (cn_assignment_df['cell_barcode'] == cell_barcode), 'clone_id'] = k
+                    NGT_df_homvaf.loc[(NGT_df_homvaf.index == cell) & (NGT_df_homvaf['cell_barcode'] == cell_barcode), 'clone_id'] = k
+                    NGT_df.loc[(NGT_df.index == cell) & (NGT_df['cell_barcode'] == cell_barcode), 'clone_id'] = k
 
     return NGT_df, cn_assignment_df, count
 
-def dissolve_small_clusters(NGT_df, cn_assignment_df, median_clusters,  count, sample_name):
+def dissolve_small_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name):
     for clone in NGT_df['clone_id'].unique():
         NGT_curr_clone = NGT_df[NGT_df['clone_id'] == clone][NGT_df.columns[:-1]]
         if NGT_curr_clone.shape[0] > 0 and NGT_curr_clone.shape[0] <= 0.05 * NGT_df.shape[0]:
             for cell, cell_profile in NGT_curr_clone.iterrows():
-                distances = profile_distance(median_clusters, cell, cell_profile)
+                cell_barcode = cell_profile['cell_barcode']
+                cell_profile = cell_profile.drop('cell_barcode')
+                distances = profile_distance(median_clusters, cell, cell_barcode, cell_profile)
                 distances = {k:v for k,v in distances.items()}
                 distances.pop(clone, None)
                 k,v = min(distances.items(), key=lambda x: x[1])
                 count += 1
-                cn_assignment_df.loc[(cn_assignment_df.index == sample_name) & (cn_assignment_df['cell_barcode'] == cell), 'clone_id'] = k
-                NGT_df.loc[cell,'clone_id'] = k
+                cn_assignment_df.loc[(cn_assignment_df.index == cell) & (cn_assignment_df['cell_barcode'] == cell_barcode), 'clone_id'] = k
+                NGT_df_homvaf.loc[(NGT_df_homvaf.index == cell) & (NGT_df_homvaf['cell_barcode'] == cell_barcode), 'clone_id'] = k
+                NGT_df.loc[(NGT_df.index == cell) & (NGT_df['cell_barcode'] == cell_barcode), 'clone_id'] = k
 
     return NGT_df, cn_assignment_df, count
 
@@ -330,12 +333,11 @@ def split_sample_clones(sample_name, NGT_df, NGT_df_homvaf, df_tapestri_clones, 
     count = 0
     added_clone = False
     
-    print(NGT_df.shape)
     median_clusters, median_clusters_all = generate_median_cluster_profiles(NGT_df)
-    NGT_df, cn_assignment_df, count = merge_large_clusters(NGT_df, cn_assignment_df, median_clusters,  count, sample_name)
-    NGT_df, cn_assignment_df, count = dissolve_small_clusters(NGT_df, cn_assignment_df, median_clusters,  count, sample_name)
-
+    NGT_df, cn_assignment_df, count = merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name)
+    NGT_df, cn_assignment_df, count = dissolve_small_clusters(NGT_df, NGT_df_homvaf,  cn_assignment_df, median_clusters,  count, sample_name)
     #split
+
     max_cn = cn_assignment_df['clone_id'].max()
     for clone in NGT_df['clone_id'].unique():
         candidates_not_found = False
@@ -344,12 +346,13 @@ def split_sample_clones(sample_name, NGT_df, NGT_df_homvaf, df_tapestri_clones, 
             NGT_curr_clone = NGT_df_homvaf[NGT_df_homvaf['clone_id'] == clone][NGT_df_homvaf.columns[:-1]]
             if NGT_curr_clone.shape[0] > 0.25 * NGT_df_homvaf.shape[0] or True: # Remove IF statement
                 for mut in NGT_curr_clone.columns:
-                    non_missing_NGT_curr_clone = NGT_curr_clone[mut].replace(3, np.NaN)
-                    mean = non_missing_NGT_curr_clone.mean()
-                    if mean < 0.75:
-                        if 2 in NGT_curr_clone[mut].unique():
-                            if NGT_curr_clone[mut].value_counts()[2.0] > 0.10 * NGT_df_homvaf.shape[0] and NGT_curr_clone[mut].value_counts()[3.0] < 0.30 * NGT_curr_clone.shape[0]:
-                                candidate_muts[mut] = NGT_curr_clone[mut].value_counts()[2.0]/NGT_curr_clone.shape[0]
+                    if mut != 'cell_barcode':
+                        non_missing_NGT_curr_clone = NGT_curr_clone[mut].replace(3, np.NaN)
+                        mean = non_missing_NGT_curr_clone.mean()
+                        if mean < 0.75:
+                            if 2 in NGT_curr_clone[mut].unique():
+                                if NGT_curr_clone[mut].value_counts()[2.0] > 0.10 * NGT_df_homvaf.shape[0] and NGT_curr_clone[mut].value_counts()[3.0] < 0.30 * NGT_curr_clone.shape[0]:
+                                    candidate_muts[mut] = NGT_curr_clone[mut].value_counts()[2.0]/NGT_curr_clone.shape[0]
 
             candidate_muts = {k: v for k, v in sorted(candidate_muts.items(), key=lambda item: item[1], reverse=True)}
             if len(candidate_muts) < 2:
@@ -365,16 +368,18 @@ def split_sample_clones(sample_name, NGT_df, NGT_df_homvaf, df_tapestri_clones, 
                 #df_tapestri_clones = df_tapestri_clones.append(new_clone_profile)
                 df_tapestri_clones.index.values[-1] = max_cn
                 for cell, cell_profile in NGT_curr_clone.iterrows():
+                    cell_barcode = cell_profile['cell_barcode']
+                    cell_profile = cell_profile.drop('cell_barcode')
                     if cell_profile.loc[candidate] == 2.0:
                         count += 1
-                        NGT_df_homvaf.loc[cell,'clone_id'] = max_cn
-                        NGT_df.loc[cell,'clone_id'] = max_cn
-                        cn_assignment_df.loc[(cn_assignment_df.index == sample_name) & (cn_assignment_df['cell_barcode'] == cell), 'clone_id'] = max_cn
+                        NGT_df.loc[(NGT_df.index == cell) & (NGT_df['cell_barcode'] == cell_barcode), 'clone_id'] = max_cn
+                        NGT_df_homvaf.loc[(NGT_df_homvaf.index == cell) & (NGT_df_homvaf['cell_barcode'] == cell_barcode), 'clone_id'] = max_cn
+                        cn_assignment_df.loc[(cn_assignment_df.index == cell) & (cn_assignment_df['cell_barcode'] == cell_barcode), 'clone_id'] = max_cn
 
     if added_clone == True:
         median_clusters, median_clusters_all = generate_median_cluster_profiles(NGT_df)
-        NGT_df, cn_assignment_df, count = merge_large_clusters(NGT_df, cn_assignment_df, median_clusters,  count, sample_name)
-        NGT_df, cn_assignment_df, count = dissolve_small_clusters(NGT_df, cn_assignment_df, median_clusters,  count, sample_name)
+        NGT_df, cn_assignment_df, count = merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name)
+        NGT_df, cn_assignment_df, count = dissolve_small_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name)
     
     print(sample_name, 'number cells changed assignment', count)
     return cn_assignment_df, NGT_df, df_tapestri_clones, added_clone_mut_dict
@@ -386,7 +391,6 @@ def main(args):
 
     amplicon_parameters = pd.read_csv(args.w)
 
-    print(amplicon_parameters)
     
     dataset = args.d
     local_directory = args.l
@@ -400,7 +404,6 @@ def main(args):
     
     df_tapestri_clones = pd.read_csv(args.n, index_col=0)
     
-    print(cn_assignment_df['clone_id'].value_counts())
     
     normal_idx = None
     if len(df_tapestri_clones.index[df_tapestri_clones.eq(2.0).all(axis=1)].to_list()) > 0:
@@ -408,11 +411,10 @@ def main(args):
     
     if normal_idx is not None:
         for c in cn_assignment_df[cn_assignment_df.index == 'RA18_18-11_1']['clone_id'].unique():
-            if len(cn_assignment_df[cn_assignment_df['clone_id'] == c])/cn_assignment_df.shape[0] > 0.05:
+            cn_normal_df = cn_assignment_df[cn_assignment_df.index == 'RA18_18-11_1']
+            if len(cn_normal_df[cn_normal_df['clone_id'] == c])/cn_normal_df.shape[0] > 0.05:
                 cn_assignment_df['clone_id'] = cn_assignment_df['clone_id'].replace(c, normal_idx)
     
-    print(cn_assignment_df['clone_id'].value_counts())
-
 
 
     raw_reads = []
@@ -458,10 +460,8 @@ def main(args):
                         curr_gene = None
             mut_idx += 1
     
-    print('tapestri_clone', df_tapestri_clones.shape)
     max_cn = max(list(cn_assignment_df['clone_id'].unique()))
     
-    print(cn_assignment_df['clone_id'].value_counts())
     for (x,y,z,a) in homdel_seps:
         for index, row in z.iterrows():
             cn_assignment_df.loc[(cn_assignment_df.index == index) & (cn_assignment_df['cell_barcode'] == row['cell_barcode']), 'clone_id'] = max_cn + 1
@@ -474,97 +474,58 @@ def main(args):
         
         max_cn += 1
     
-    print(cn_assignment_df['clone_id'].value_counts())
     samples = cn_assignment_df.index.to_series()
     samples = samples.unique()
     
-    NGT_dfs = []
-
-    for name in samples:
-        cravat_df = None
-        sample_obj = None
-        hdf5_f = None
-        for file in os.listdir(local_directory + dataset + '/'):
-            if file.startswith(dataset):
-                # CRAVAT File
-                if file.endswith('.txt'):
-                    cravat_f = local_directory + dataset + '/' + file
-                    cravat_df = pd.read_csv(cravat_f, sep='\t', index_col=0, header=[0,1])
-                # HDF5 File
-                if file.endswith('.h5'):
-                    hdf5_f = local_directory + dataset + '/' + file
-                    sample_obj = mio.load(hdf5_f)
-                    sample_obj_homvaf = mio.load(hdf5_f)
-                    sample_obj.dna.genotype_variants(min_dp = 8, min_alt_read = 3, assign_low_conf_genotype=False)
-                    sample_obj_homvaf.dna.genotype_variants(min_dp = 8, het_vaf=5, hom_vaf = 99)# assign_low_conf_genotype=False)
-            
-        # Initialize Clone Assignments
-        unique_cluster_ids_sorted = np.sort(np.unique(cn_assignment_df['clone_id'].astype(int)))
-        unique_cluster_ids_sorted_named = [ f"CN_clone-{clone_i}" for clone_i in unique_cluster_ids_sorted ]
-        unique_cluster_ids_sorted = [i % 24 for i in unique_cluster_ids_sorted]
-        cn_clone_palette = dict(zip(unique_cluster_ids_sorted_named, np.array(px.colors.qualitative.Light24)[unique_cluster_ids_sorted]))
-        cn_assignment_dict = cn_assignment_df.loc[name,:].set_index('cell_barcode').to_dict()['clone_id']
-        sample_barcodes = [barcode.split('-')[0] for barcode in sample_obj.dna.barcodes() if barcode.split('-')[1] == name]
-        sample_obj.dna.row_attrs['label'] = np.array(list(map(lambda x: f"CN_clone-{int(cn_assignment_dict[x])}", sample_barcodes)))
-        sample_obj.dna.set_palette(cn_clone_palette)
-
-
-
-        fig, germline_mutations = get_figure_and_germline_mutations(cravat_df, sample_obj, name, analysis_config, args.s)
-
-        # Initialize NGT dataframe
-        NGT_df = sample_obj.dna.get_attribute('NGT', constraint='row')
-        NGT_df = NGT_df[NGT_df.index.str.contains(name)]
-        NGT_df.index = NGT_df.index.str.split('-').str[0]
+    cravat_df = None
+    sample_obj = None
+    hdf5_f = None
+    for file in os.listdir(local_directory + dataset + '/'):
+        if file.startswith(dataset):
+            # CRAVAT File
+            if file.endswith('.txt'):
+                cravat_f = local_directory + dataset + '/' + file
+                cravat_df = pd.read_csv(cravat_f, sep='\t', index_col=0, header=[0,1])
+            # HDF5 File
+            if file.endswith('.h5'):
+                hdf5_f = local_directory + dataset + '/' + file
+                sample_obj = mio.load(hdf5_f)
+                sample_obj_homvaf = mio.load(hdf5_f)
+                sample_obj.dna.genotype_variants(min_dp = 8, min_alt_read = 3, assign_low_conf_genotype=False)
+                sample_obj_homvaf.dna.genotype_variants(min_dp = 8, het_vaf=5, hom_vaf = 99)# assign_low_conf_genotype=False)
         
 
-        NGT_df = pd.merge(NGT_df, cn_assignment_df.loc[name,:],left_on=NGT_df.index, right_on='cell_barcode', how='left')
-        NGT_df.set_index('cell_barcode', inplace=True)
-        NGT_df = NGT_df[NGT_df['clone_id'].notna()]
+    fig, germline_mutations = get_figure_and_germline_mutations(cravat_df, sample_obj, analysis_config, args.s)
 
-        NGT_df_homvaf = sample_obj_homvaf.dna.get_attribute('NGT', constraint='row')
-        NGT_df_homvaf = NGT_df_homvaf[NGT_df_homvaf.index.str.contains(name)]
-        NGT_df_homvaf.index = NGT_df_homvaf.index.str.split('-').str[0]
+    # Initialize NGT dataframe
+    NGT_df = sample_obj.dna.get_attribute('NGT', constraint='row')
+    NGT_df['idx'] = NGT_df.index.str.split('-').str[1] + '-' + NGT_df.index.str.split('-').str[2]
+    NGT_df['cell_barcode'] = NGT_df.index.str.split('-').str[0] 
+    NGT_df = NGT_df.reset_index(drop=True)
+    NGT_df.set_index('idx', inplace=True)
+    NGT_df = pd.merge(NGT_df, cn_assignment_df,on=['idx', 'cell_barcode'], how='inner')
+    NGT_df = NGT_df[NGT_df['clone_id'].notna()]
 
-        NGT_df_homvaf = pd.merge(NGT_df_homvaf, cn_assignment_df.loc[name,:],left_on=NGT_df_homvaf.index, right_on='cell_barcode', how='left')
-        NGT_df_homvaf.set_index('cell_barcode', inplace=True)
-        NGT_df_homvaf = NGT_df_homvaf[NGT_df_homvaf['clone_id'].notna()]
 
-        bin_NGT_df = binarize_NGT_matrix(NGT_df)
-        
-        cn_assignment_df, NGT_df, df_tapestri_clones, added_clone_mut_dict = split_sample_clones(name, bin_NGT_df[germline_mutations + ['clone_id']], NGT_df_homvaf[germline_mutations + ['clone_id']], df_tapestri_clones, cn_assignment_df, added_clone_mut_dict)
 
-        unique_cluster_ids_sorted = np.sort(np.unique(cn_assignment_df['clone_id'].astype(int)))
-        unique_cluster_ids_sorted_named = [ f"CN_clone-{clone_i}" for clone_i in unique_cluster_ids_sorted ]
-        unique_cluster_ids_sorted = [i for i in range(len(unique_cluster_ids_sorted))]
-        unique_cluster_ids_sorted = [i %24 for i in unique_cluster_ids_sorted]
-        cn_clone_palette = dict(zip(unique_cluster_ids_sorted_named, np.array(px.colors.qualitative.Light24)[unique_cluster_ids_sorted]))
-        cn_assignment_dict = cn_assignment_df.loc[name,:].set_index('cell_barcode').to_dict()['clone_id']
-        sample_barcodes = [barcode.split('-')[0] for barcode in sample_obj.dna.barcodes() if barcode.split('-')[1] == name]
-        sample_obj.dna.row_attrs['label'] = np.array(list(map(lambda x: f"CN_clone-{int(cn_assignment_dict[x])}", sample_barcodes)))
-        sample_obj.dna.set_palette(cn_clone_palette)
+    NGT_df_homvaf = sample_obj_homvaf.dna.get_attribute('NGT', constraint='row')
+    NGT_df_homvaf['idx'] = NGT_df_homvaf.index.str.split('-').str[1] + '-' + NGT_df_homvaf.index.str.split('-').str[2]
+    NGT_df_homvaf['cell_barcode'] = NGT_df_homvaf.index.str.split('-').str[0] 
+    NGT_df_homvaf = NGT_df_homvaf.reset_index(drop=True)
+    NGT_df_homvaf.set_index('idx', inplace=True)
+    NGT_df_homvaf = pd.merge(NGT_df_homvaf, cn_assignment_df,on=['idx', 'cell_barcode'], how='inner')
+    NGT_df_homvaf = NGT_df_homvaf[NGT_df_homvaf['clone_id'].notna()]
+ 
+    
+    bin_NGT_df = binarize_NGT_matrix(NGT_df)
+    name = ""
+    cn_assignment_df, NGT_df, df_tapestri_clones, added_clone_mut_dict = split_sample_clones(name, bin_NGT_df[germline_mutations + ['cell_barcode', 'clone_id']], NGT_df_homvaf[germline_mutations + ['cell_barcode', 'clone_id']], df_tapestri_clones, cn_assignment_df, added_clone_mut_dict)
+    
 
-        NGT_df.index = name + ':'+ NGT_df.index.astype(str)
-        NGT_dfs.append(NGT_df)
+    _, median_clusters_all = generate_median_cluster_profiles(NGT_df) #bin_NGT_df?
 
-        #fig, germline_mutations = get_figure_and_somatic_mutations(cravat_df, sample_obj, name)
-        '''
-        Path(f'{dataset}-refined-VAF-heatmaps').mkdir(exist_ok=True)
-        fig.write_image(
-        f'{dataset}-refined-VAF-heatmaps/{name}.pdf',
-        )
-        '''
-    combined_NGT_df = pd.concat(NGT_dfs, axis=0)
-    combined_NGT_df = combined_NGT_df.fillna(3.0)
-
+    combined_NGT_df, cn_assignment_df, df_tapestri_clones = combine_similar_final_clusters(NGT_df, cn_assignment_df, median_clusters_all, df_tapestri_clones)
     _, median_clusters_all = generate_median_cluster_profiles(combined_NGT_df)
-
-    print(combined_NGT_df)
-    print(combined_NGT_df['clone_id'].value_counts())
-    print(df_tapestri_clones)
-
-    #combined_NGT_df, cn_assignment_df, df_tapestri_clones = combine_similar_final_clusters(combined_NGT_df, cn_assignment_df, median_clusters_all, df_tapestri_clones)
-    #_, median_clusters_all = generate_median_cluster_profiles(combined_NGT_df)
 
     no_merge_candidate = False
     while(no_merge_candidate == False):
@@ -576,14 +537,12 @@ def main(args):
                 clone2 = sorted_ids[i2]
 
                 if clone1 != clone2:
-                    print(df_tapestri_clones)
                     if np.array_equal(df_tapestri_clones.loc[clone1].to_numpy(), df_tapestri_clones.loc[clone2].to_numpy()):
                         distance = median_distance(median_clusters_all, clone1, clone2)
                         if distance <= 0.10 or (added_clone_mut_dict[clone1] == added_clone_mut_dict[clone2]):
                             merging_candidates[(clone1, clone2)] = distance
     
         merging_candidates = {k: v for k, v in sorted(merging_candidates.items(), key=lambda item: item[1], reverse=False)}
-        print(merging_candidates)
         if len(merging_candidates) == 0:
             no_merge_candidate = True
         else:
@@ -593,41 +552,7 @@ def main(args):
             combined_NGT_df['clone_id'] = combined_NGT_df['clone_id'].replace(clone2, clone1)
             df_tapestri_clones = df_tapestri_clones.drop(index=clone2)
 
-    '''
-    for name in samples:
-        print(name)
-        cravat_df = None
-        sample_obj = None
-        hdf5_f = None
-        for file in os.listdir(local_directory + dataset + '/'):
-            if file.startswith(dataset):
-                # CRAVAT File
-                if file.endswith('.txt'):
-                    cravat_f = local_directory + dataset + '/' + file
-                    cravat_df = pd.read_csv(cravat_f, sep='\t', index_col=0, header=[0,1])
-                # HDF5 File
-                if file.endswith('.h5'):
-                    hdf5_f = local_directory + dataset + '/' + file
-                    sample_obj = mio.load(hdf5_f)
-                    sample_obj.dna.genotype_variants(min_dp = 8, min_alt_read = 3, assign_low_conf_genotype=False)
-
-
-        # Initialize Clone Assignments
-
-        unique_cluster_ids_sorted = np.sort(np.unique(cn_assignment_df['clone_id'].astype(int)))
-        unique_cluster_ids_sorted_named = [ f"CN_clone-{clone_i}" for clone_i in unique_cluster_ids_sorted ]
-        unique_cluster_ids_sorted = [i % 24 for i in unique_cluster_ids_sorted]
-        cn_clone_palette = dict(zip(unique_cluster_ids_sorted_named, np.array(px.colors.qualitative.Light24)[unique_cluster_ids_sorted]))
-        cn_assignment_dict = cn_assignment_df.loc[name,:].set_index('cell_barcode').to_dict()['clone_id']
-        sample_barcodes = [barcode.split('-')[0] for barcode in sample_obj.dna.barcodes() if barcode.split('-')[1] == name]
-        sample_obj.dna.row_attrs['label'] = np.array(list(map(lambda x: f"CN_clone-{int(cn_assignment_dict[x])}", sample_barcodes)))
-        sample_obj.dna.set_palette(cn_clone_palette)
-        #fig, germline_mutations = get_figure_and_somatic_mutations(cravat_df, sample_obj, name)
-        #Path(f'{dataset}-refined-VAF-heatmaps').mkdir(exist_ok=True)
-        #fig.write_image(f'{dataset}-refined-VAF-heatmaps/{name}.pdf')
-    '''
-
-    cn_assignment_df = cn_assignment_df[cn_assignment_df.index != 'RA18_18-11_1']
+    #cn_assignment_df = cn_assignment_df[cn_assignment_df.index != 'RA18_18-11_1']
     n_idx = 0
     new_idx_dict = {}
     for c_id in df_tapestri_clones.index:
@@ -645,10 +570,6 @@ def main(args):
 
     ampl_cols = [c for c in df_tapestri_clones.columns if c.startswith('AMPL')]
     matching_rows = df_tapestri_clones.loc[(df_tapestri_clones[ampl_cols] == len(ampl_cols) * [2.0]).all(axis=1)]
-    print(matching_rows)
-    print(cn_assignment_df['clone_id'].value_counts())
-
-    print(df_tapestri_clones)
 
     if len(list(matching_rows.index)) > 0:
         row_index1 = 0
@@ -657,7 +578,6 @@ def main(args):
 
         df_tapestri_clones.iloc[row_index1], df_tapestri_clones.iloc[row_index2] = df_tapestri_clones.iloc[row_index2].copy(), df_tapestri_clones.iloc[row_index1].copy()
     
-    print(cn_assignment_df['clone_id'].value_counts())
     cn_assignment_df.to_csv(args.a)
     df_tapestri_clones.to_csv(args.p)
 
