@@ -429,7 +429,7 @@ if __name__ == "__main__":
     parser.add_argument('--amp_gene_map_f', type=str, required=True, help = 'CSV/TSV file with amplicon IDs in the first column. Required columns: `chr` and `gene`. Please make sure the amplicon IDs are ordered by genomic coordinates for best plotting results.')
     parser.add_argument('--cn_clone_profiles_csv', type=str, help='amplicon-level CN clone profile', required=True)
     parser.add_argument('--sample_sc_clone_assignment_csv', type=str, help='df assigning each sample, each single cell to each CN cluster. Therefore the 3 columns, in order, must be `sample_name`, `single-cell ID`, `clone_id`. Only the `clone_id` column needs to be named.', required=True)
-    parser.add_argument('--clone_prev_threshold', type=float, help='do not shoe profile of CN clone smaller than this cell prevalence', default=0.01)
+    parser.add_argument('--clone_prev_threshold', type=float, help='Cells belonging to clones smaller than this will be merged into the diploid clone.', default=0.01)
     parser.add_argument('--output_dir', type=str, help='output directory', required=True)
     parser.add_argument('--output_f_prefix', type=str, help='output file prefix', default='')
     parser.add_argument('--clone_cleanup', type=bool, help='remove duplicated clones and clones with too few cells; rename clones so that the diploid clone is 0', default=True)
