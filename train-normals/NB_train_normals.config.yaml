@@ -1,6 +1,5 @@
 output_dir:
-    /home/zhangh5/work/Tapestri_batch2/analysis/cn_clones/train-normal_samples/train-combined_8_normals
-
+    /home/zhangh5/work/Tapestri_project/cn-calling/train-normals/train-combined_8_normals
 run_topic:
 # to be used for naming output files
     NB_train-combined_8_normals

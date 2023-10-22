@@ -133,34 +133,34 @@ def main(args):
         clone_swap_map.update({i: i for i in set(sample_sc_clone_assignment_df['clone_id']) - set(smaller_clones)})
         sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(clone_swap_map).astype(int)
 
-    cluster_rename_map = dict(zip(
-        unique_cn_clone_profiles_df.index, 
-        np.arange(unique_cn_clone_profiles_df.shape[0]))
-        )
-    # if required, write the cluster_rename_map to a JSON
-    if args.write_cluster_rename_map_json:
-        # convert everything from numpy int64 to python int
-        cluster_rename_map = {int(k): int(v) for k,v in cluster_rename_map.items()}
-        with open(output_dir / f'{cohort_name}{output_f_prefix}.cluster_rename_map.json','w') as f:
-            json_object = json.dumps(cluster_rename_map)
-            f.write(json_object)
+        cluster_rename_map = dict(zip(
+            unique_cn_clone_profiles_df.index, 
+            np.arange(unique_cn_clone_profiles_df.shape[0]))
+            )
+        # if required, write the cluster_rename_map to a JSON
+        if args.write_cluster_rename_map_json:
+            # convert everything from numpy int64 to python int
+            cluster_rename_map = {int(k): int(v) for k,v in cluster_rename_map.items()}
+            with open(output_dir / f'{cohort_name}{output_f_prefix}.cluster_rename_map.json','w') as f:
+                json_object = json.dumps(cluster_rename_map)
+                f.write(json_object)
 
         # embed()
         sample_sc_clone_assignment_df['clone_id'] = sample_sc_clone_assignment_df['clone_id'].map(cluster_rename_map)
-        sample_sc_clone_assignment_df.to_csv(
-            output_dir / f'{cohort_name}{output_f_prefix}.sample_sc_clone_assignment.updated.csv',
-            index=False, header=True
-        )
         unique_cn_clone_profiles_df.index = unique_cn_clone_profiles_df.index.map(cluster_rename_map)
-        unique_cn_clone_profiles_df.to_csv(
-            output_dir / f'{cohort_name}{output_f_prefix}.unique_cn_clone_profiles.csv',
-            index=True, header=True
-        )
 
     else:
         unique_cn_clone_profiles_df = cn_clone_profiles_df
     # reset index, fill in non-converged amplicons
     unique_cn_clone_profiles_df = unique_cn_clone_profiles_df.reindex(columns = amp_gene_map_df.index, fill_value=-1)
+    sample_sc_clone_assignment_df.to_csv(
+        output_dir / f'{cohort_name}{output_f_prefix}.sample_sc_clone_assignment.updated.csv',
+        index=False, header=True
+    )
+    unique_cn_clone_profiles_df.to_csv(
+        output_dir / f'{cohort_name}{output_f_prefix}.unique_cn_clone_profiles.csv',
+        index=True, header=True
+    )
     
     # _____________________
 
