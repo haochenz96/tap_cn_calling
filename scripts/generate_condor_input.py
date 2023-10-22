@@ -168,10 +168,10 @@ def get_filtered_mutations(cravat_df, sample_obj, sample_name, analysis_config, 
     voi_union = voi_union.difference(ado_blacklist)
     print(f"[DEBUG] {len(voi_union)} SNVs after ADO blacklist filtering")
     
-    total_mutations = []
+    all_mutations = []
     germline_mutations = []
     for var_i in ann_map:
-        total_mutations.append(var_i)
+        all_mutations.append(var_i)
         # germline
         if var_i in bulk_germline_vars:
             germline_mutations.append(var_i)
@@ -199,18 +199,18 @@ def get_filtered_mutations(cravat_df, sample_obj, sample_name, analysis_config, 
         snvs = pd.read_csv(manually_annotated_snvs, sep='\t', comment='#')
         snvs.replace(np.nan, '', inplace=True)
         germline_mutations = snvs[(snvs['annotation'] == 'germline_HET')]['condensed_format'].to_list()
-        total_mutations = snvs[(snvs['annotation'] != 'likely_artifact') & (snvs['annotation'] != 'germline_HOM')]['condensed_format'].to_list()
+        all_mutations = snvs[(snvs['annotation'] != 'likely_artifact') & (snvs['annotation'] != 'germline_HOM')]['condensed_format'].to_list()
         somatic_mutations = snvs[snvs['annotation'] == 'bulk_somatic']['condensed_format'].to_list()
  
 
     germline_mutations = list(set(germline_mutations))
     somatic_mutations = list(set(somatic_mutations))
-    total_mutations = list(set(total_mutations))
+    all_mutations = list(set(all_mutations))
 
-    print(len(germline_mutations), len(somatic_mutations), len(total_mutations))
+    print(len(germline_mutations), len(somatic_mutations), len(all_mutations))
 
-    print(total_mutations)
-    return total_mutations, germline_mutations, somatic_mutations
+    print(all_mutations)
+    return all_mutations, germline_mutations, somatic_mutations
 
     
 def generate_condor_input(sample_name, cn_assignment_df, args, analysis_config, bin_thres=0.5):
@@ -222,7 +222,7 @@ def generate_condor_input(sample_name, cn_assignment_df, args, analysis_config, 
 
     df_total_samples = []
     df_alt_samples = []
-    common_mutations = []
+    all_mutations = []
     germline_mutations = []
     somatic_mutations = []
     cravat_f = args.l + sample_name + '/' + sample_name + '_CRAVAT_output_cleaned.txt'
@@ -243,10 +243,17 @@ def generate_condor_input(sample_name, cn_assignment_df, args, analysis_config, 
                 df_total_snv = sample_obj.dna.get_attribute('DP', constraint='row')
                 
                 print(df_alt_snv.shape)
-                cmuts, gmuts, smuts = get_filtered_mutations(cravat_df, sample_obj, sample_name, analysis_config, args.snvs)
-                common_mutations = cmuts
-                germline_mutations = gmuts
-                somatic_mutations = smuts
+                if args.snvs is not None and os.stat(args.snvs).st_size != 0:
+                    snvs = pd.read_csv(args.snvs, sep='\t', comment='#')
+                    snvs.replace(np.nan, '', inplace=True)
+                    germline_mutations = snvs[(snvs['annotation'] == 'germline_HET')]['condensed_format'].to_list()
+                    all_mutations = snvs[(snvs['annotation'] != 'likely_artifact') & (snvs['annotation'] != 'germline_HOM')]['condensed_format'].to_list()
+                    somatic_mutations = snvs[snvs['annotation'] == 'bulk_somatic']['condensed_format'].to_list()
+            
+
+                germline_mutations = list(set(germline_mutations))
+                somatic_mutations = list(set(somatic_mutations))
+                all_mutations = list(set(all_mutations))
                 
                 df_alt_snv.reset_index(inplace=True)
                 df_alt_snv = df_alt_snv.rename(columns = {'index':'cell_barcode'})
@@ -263,16 +270,16 @@ def generate_condor_input(sample_name, cn_assignment_df, args, analysis_config, 
         x[2], x[3] = x[3], x[2]
         return "_".join(x)
 
-    common_mutations = list(map(mut_replace, common_mutations))
+    all_mutations = list(map(mut_replace, all_mutations))
     germline_mutations_list = list(map(mut_replace, germline_mutations))
     somatic_mutations_list = list(map(mut_replace, somatic_mutations))
-    print(len(common_mutations))
+    print(len(all_mutations))
     
     df_total = pd.concat(df_total_samples, ignore_index=True)
     df_total = df_total.rename(columns = {'DP':'cell_barcode'})
     df_total = df_total.rename(columns={c: mut_replace(c) for c in df_total.columns if c not in ['cell_barcode']})
 
-    df_total = df_total[['cell_barcode'] + common_mutations]
+    df_total = df_total[['cell_barcode'] + all_mutations]
     df_total = df_total.set_index('cell_barcode')
     df_total = df_total.fillna(0)
     
@@ -280,7 +287,7 @@ def generate_condor_input(sample_name, cn_assignment_df, args, analysis_config, 
     df_alt = df_alt.rename(columns = {'alt_read_count':'cell_barcode'})
     df_alt = df_alt.rename(columns={c: mut_replace(c) for c in df_alt.columns if c not in ['cell_barcode']})
 
-    df_alt = df_alt[['cell_barcode'] + common_mutations]
+    df_alt = df_alt[['cell_barcode'] + all_mutations]
     df_alt = df_alt.set_index('cell_barcode')
     df_alt = df_alt.fillna(0)
     

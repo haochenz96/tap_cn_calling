@@ -47,13 +47,9 @@ def median_distance(medians, clone1, clone2):
     """
     median_profile1 = medians[clone1]
     median_profile2 = medians[clone2]
-    mask = median_profile1 != 3
-    mask2 = median_profile2 != 3
-    mask = np.logical_and(mask, mask2)
-    series1 = median_profile1[mask]
-    series2 = median_profile2[mask]
-    absolute_sum = np.sqrt(((series1 - series2)**2).sum())
-    distance = absolute_sum/series2.shape[0]
+    mask = (median_profile1 != 3 & median_profile2 != 3)
+    absolute_sum = np.sqrt(((median_profile1[mask] - median_profile2[mask])**2).sum())
+    distance = absolute_sum/median_profile2[mask].shape[0]
 
     return distance
 
@@ -63,17 +59,16 @@ def generate_median_cluster_profiles(NGT_df):
 
     for clone in NGT_df['clone_id'].unique():
         NGT_curr_clone = NGT_df[NGT_df['clone_id'] == clone][NGT_df.columns[:-2]]
+        NGT_curr_clone_mode = NGT_curr_clone.mode(axis=0)
         if NGT_curr_clone.shape[0] > 0:
-            if NGT_curr_clone.mode().squeeze(axis=0).shape[0] == 2 or NGT_curr_clone.mode().squeeze(axis=0).shape[0] == 3:
-                median_clusters_all[clone] = NGT_curr_clone.mode().squeeze(axis=0).iloc[0]
+            if NGT_curr_clone_mode.shape[0] > 1: 
+            # if multiple modes exist, choose the first one
+                median_clusters_all[clone] = NGT_curr_clone_mode.iloc[0].squeeze(axis=0)
             else:
-                median_clusters_all[clone] = NGT_curr_clone.mode().squeeze(axis=0)
+                median_clusters_all[clone] = NGT_curr_clone_mode.squeeze(axis=0)
 
-        if NGT_curr_clone.shape[0] > 0.05 * NGT_df.shape[0]:
-            if NGT_curr_clone.mode().squeeze(axis=0).shape[0] == 2 or NGT_curr_clone.mode().squeeze(axis=0).shape[0] == 3:
-                median_clusters[clone] = NGT_curr_clone.mode().squeeze(axis=0).iloc[0]
-            else:
-                median_clusters[clone] = NGT_curr_clone.mode().squeeze(axis=0)
+            if NGT_curr_clone.shape[0] > 0.05 * NGT_df.shape[0]:
+                median_clusters[clone] = median_clusters_all[clone]
 
     return median_clusters, median_clusters_all
 
@@ -115,7 +110,7 @@ def combine_similar_final_clusters(NGT_df, cn_assignment_df, median_clusters, df
 
     return NGT_df, cn_assignment_df, df_tapestri_clones
 
-def merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name):
+def merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count):
     for clone in NGT_df['clone_id'].unique():
         NGT_curr_clone = NGT_df[NGT_df['clone_id'] == clone][NGT_df.columns[:-1]]
         if NGT_curr_clone.shape[0] > 0.05 * NGT_df.shape[0]:
@@ -133,7 +128,7 @@ def merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_cluster
 
     return NGT_df, cn_assignment_df, count
 
-def dissolve_small_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name):
+def dissolve_small_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count):
     for clone in NGT_df['clone_id'].unique():
         NGT_curr_clone = NGT_df[NGT_df['clone_id'] == clone][NGT_df.columns[:-1]]
         if NGT_curr_clone.shape[0] > 0 and NGT_curr_clone.shape[0] <= 0.05 * NGT_df.shape[0]:
@@ -156,8 +151,8 @@ def split_sample_clones(sample_name, NGT_df, NGT_df_homvaf, df_tapestri_clones, 
     added_clone = False
     
     median_clusters, median_clusters_all = generate_median_cluster_profiles(NGT_df)
-    NGT_df, cn_assignment_df, count = merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name)
-    NGT_df, cn_assignment_df, count = dissolve_small_clusters(NGT_df, NGT_df_homvaf,  cn_assignment_df, median_clusters,  count, sample_name)
+    NGT_df, cn_assignment_df, count = merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count)
+    NGT_df, cn_assignment_df, count = dissolve_small_clusters(NGT_df, NGT_df_homvaf,  cn_assignment_df, median_clusters,  count)
     #split
 
     max_cn = cn_assignment_df['clone_id'].max()
@@ -166,15 +161,15 @@ def split_sample_clones(sample_name, NGT_df, NGT_df_homvaf, df_tapestri_clones, 
         while(candidates_not_found == False):
             candidate_muts = {}
             NGT_curr_clone = NGT_df_homvaf[NGT_df_homvaf['clone_id'] == clone][NGT_df_homvaf.columns[:-1]]
-            if NGT_curr_clone.shape[0] > 0.25 * NGT_df_homvaf.shape[0] or True: # Remove IF statement
-                for mut in NGT_curr_clone.columns:
-                    if mut != 'cell_barcode':
-                        non_missing_NGT_curr_clone = NGT_curr_clone[mut].replace(3, np.NaN)
-                        mean = non_missing_NGT_curr_clone.mean()
-                        if mean < 0.75:
-                            if 2 in NGT_curr_clone[mut].unique():
-                                if NGT_curr_clone[mut].value_counts()[2.0] > 0.10 * NGT_df_homvaf.shape[0] and NGT_curr_clone[mut].value_counts()[3.0] < 0.30 * NGT_curr_clone.shape[0]:
-                                    candidate_muts[mut] = NGT_curr_clone[mut].value_counts()[2.0]/NGT_curr_clone.shape[0]
+            non_missing_NGT_curr_clone = NGT_curr_clone.replace(3, np.NaN)
+
+            for mut in NGT_curr_clone.columns:
+                if mut != 'cell_barcode':
+                    mean = non_missing_NGT_curr_clone[mut].mean()
+                    if mean < 0.75:
+                        if 2 in NGT_curr_clone[mut].unique():
+                            if NGT_curr_clone[mut].value_counts()[2.0] > 0.10 * NGT_df_homvaf.shape[0] and NGT_curr_clone[mut].value_counts()[3.0] < 0.30 * NGT_curr_clone.shape[0]:
+                                candidate_muts[mut] = NGT_curr_clone[mut].value_counts()[2.0]/NGT_curr_clone.shape[0]
 
             candidate_muts = {k: v for k, v in sorted(candidate_muts.items(), key=lambda item: item[1], reverse=True)}
             if len(candidate_muts) < 2:
@@ -200,8 +195,8 @@ def split_sample_clones(sample_name, NGT_df, NGT_df_homvaf, df_tapestri_clones, 
 
     if added_clone == True:
         median_clusters, median_clusters_all = generate_median_cluster_profiles(NGT_df)
-        NGT_df, cn_assignment_df, count = merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name)
-        NGT_df, cn_assignment_df, count = dissolve_small_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count, sample_name)
+        NGT_df, cn_assignment_df, count = merge_large_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count)
+        NGT_df, cn_assignment_df, count = dissolve_small_clusters(NGT_df, NGT_df_homvaf, cn_assignment_df, median_clusters,  count)
     
     print(sample_name, 'number cells changed assignment', count)
     return cn_assignment_df, NGT_df, df_tapestri_clones, added_clone_mut_dict
@@ -210,7 +205,7 @@ def main(args):
     ####################################             
     # ##### 0. prepare inputs ##########
     ####################################
-    amplicon_parameters = pd.read_csv(args.w)
+    amplicon_parameters = pd.read_csv(args.w) # for homdel. get gene connectivity.
     dataset = args.d
     snv_dir = Path(args.l) # 
     print('Current dataset:', dataset)
@@ -262,7 +257,7 @@ def main(args):
     samples = samples.unique()
 
     patient_fillout_h5 = snv_dir.glob(f'{dataset}.patient*.h5')[0]
-    sample_obj = mio.load(hdf5_f)
+    sample_obj = mio.load(patient_fillout_h5)
     sample_obj_homvaf = deepcopy(sample_obj)
     sample_obj.dna.genotype_variants(min_dp = 8, min_alt_read = 3, assign_low_conf_genotype=False)
     sample_obj_homvaf.dna.genotype_variants(min_dp = 8, het_vaf=5, hom_vaf = 99)# assign_low_conf_genotype=False)
@@ -283,11 +278,11 @@ def main(args):
     NGT_df_homvaf.set_index('sample_name', inplace=True)
     NGT_df_homvaf = pd.merge(NGT_df_homvaf, cn_assignment_df,on=['sample_name', 'cell_barcode'], how='inner')
     NGT_df_homvaf = NGT_df_homvaf[NGT_df_homvaf['clone_id'].notna()]
- 
+    bin_NGT_df = __binarize_NGT_matrix(NGT_df)
     ####################################             
     # ##### A. clone splitting #########
     ####################################
-    bin_NGT_df = __binarize_NGT_matrix(NGT_df)
+    
     name = ""
     cn_assignment_df, NGT_df, df_tapestri_clones, added_clone_mut_dict = split_sample_clones(
         name, 
