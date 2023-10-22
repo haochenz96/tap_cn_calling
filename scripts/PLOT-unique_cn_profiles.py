@@ -16,6 +16,9 @@ import yaml, json
 
 from IPython import embed
 
+color_sequence = px.colors.qualitative.Set3
+import seaborn as sns
+
 def main(args):
 
     ######### --LOG-- ###########
@@ -50,6 +53,10 @@ def main(args):
     cn_clone_profiles_df = pd.read_csv(args.cn_clone_profiles_csv, index_col=0, header=0)
     sample_sc_clone_assignment_df = pd.read_csv(args.sample_sc_clone_assignment_csv, index_col=False, header=0)
 
+    # @HZ 2023-10-04 temporary fix: rename `tree_renamed_clone_id` to `clone_id`
+    sample_sc_clone_assignment_df.rename(columns={'tree_renamed_clone_id': 'clone_id', 'sample_name': 'sample'}, inplace=True)
+    sample_sc_clone_assignment_df = sample_sc_clone_assignment_df[['sample', 'cell_barcode', 'clone_id']]
+
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     output_f_prefix = args.output_f_prefix
@@ -81,7 +88,8 @@ def main(args):
     gene_names = amp_gene_map_df.loc[unique_amplicon_order, GENE_COL_NAME].values
     gene_names_to_plot = pd.Series(gene_names).value_counts()[pd.Series(gene_names).value_counts() >= 3].index # plot gene names covered by at least 3 amplicons
 
-    if args.clone_cleanup:
+    if not args.omit_clone_cleanup:
+        # print(f"[DEBUG] -- {args.clone_cleanup}")
         # --> 1. find duplicated clones
         # by design, clones with identical CN profiles should not be in sample_sc_clone_assignment_df, but if they do, we remove them:
         duplicated_clones = []
@@ -174,29 +182,32 @@ def main(args):
         # sys.exit(0) #@HZ this seems to cause Snakemake to think there's an error
         return
     # embed()
-    cn_clone_palette = dict(zip(cluster_labels, np.array(px.colors.qualitative.Set3)[cluster_labels]))
+    color_sequence = sns.cubehelix_palette(n_colors = len(cluster_labels),start=.0, rot=2, light=0.8, dark=0.5, hue=3.5).as_hex()
+    cn_clone_palette = dict(zip(cluster_labels, np.array(color_sequence)[cluster_labels]))
     cluster_colors = [cn_clone_palette[i] for i in cluster_labels]
 
     ###########  ----- CN cluster profiles -----  ################
     # draw subplots
     fig = make_subplots(
-            rows=2, cols=2,
-            shared_yaxes=True, shared_xaxes=True,
-            horizontal_spacing=0.01,
-            vertical_spacing=0.01,
-            column_widths=[1 / 25, 24 / 25],
-            row_heights=[1 / 25, 24 / 25],
-            )
+        rows=2, cols=2,
+        shared_yaxes=True, shared_xaxes=True,
+        horizontal_spacing=0.01,
+        vertical_spacing=0.01,
+        column_widths=[1 / 25, 24 / 25],
+        row_heights=[1 / 25, 24 / 25],
+        )
 
     # get labels
-    labs = go.Heatmap(z=cluster_labels,
-                        y=np.arange(unique_cn_clone_profiles_df.shape[0]),
-                        x=[0] * unique_cn_clone_profiles_df.shape[0],
-                        customdata=cluster_labels,
-                        colorscale=cluster_colors,
-                        hovertemplate='label: %{customdata}<extra></extra>',
-                        showlegend=False,
-                        showscale=False)
+    labs = go.Heatmap(
+        z=cluster_labels,
+        y=np.arange(unique_cn_clone_profiles_df.shape[0]),
+        x=[0] * unique_cn_clone_profiles_df.shape[0],
+        customdata=cluster_labels,
+        colorscale=cluster_colors,
+        hovertemplate='label: %{customdata}<extra></extra>',
+        showlegend=False,
+        showscale=False
+        )
     fig.add_trace(labs, row=2, col=1)
 
     # @HZ 12/20/2022: both ticktext and tickvals are needed to manually draw the ticklabels, otherwise it won't show up
@@ -436,10 +447,10 @@ if __name__ == "__main__":
     parser.add_argument('--amp_gene_map_f', type=str, required=True, help = 'CSV/TSV file with amplicon IDs in the first column. Required columns: `chr` and `gene`. Please make sure the amplicon IDs are ordered by genomic coordinates for best plotting results.')
     parser.add_argument('--cn_clone_profiles_csv', type=str, help='amplicon-level CN clone profile', required=True)
     parser.add_argument('--sample_sc_clone_assignment_csv', type=str, help='df assigning each sample, each single cell to each CN cluster. Therefore the 3 columns, in order, must be `sample_name`, `single-cell ID`, `clone_id`. Only the `clone_id` column needs to be named.', required=True)
-    parser.add_argument('--clone_prev_threshold', type=float, help='do not shoe profile of CN clone smaller than this cell prevalence', default=0.01)
+    parser.add_argument('--clone_prev_threshold', type=float, help='Cells belonging to clones smaller than this will be merged into the diploid clone.', default=0.01)
     parser.add_argument('--output_dir', type=str, help='output directory', required=True)
     parser.add_argument('--output_f_prefix', type=str, help='output file prefix', default='')
-    parser.add_argument('--clone_cleanup', type=bool, help='remove duplicated clones and clones with too few cells; rename clones so that the diploid clone is 0', default=True)
+    parser.add_argument('--omit_clone_cleanup', default=False, action='store_true', help='remove duplicated clones and clones with too few cells; rename clones so that the diploid clone is 0, while organizing other clones into an ascending sequence. If this flag is set, the clone cleanup will be skipped. Please make sure the cloen IDs are named as a sequence of integers starting from 0.')
     parser.add_argument('--plot_homdel', type=bool, help='for genes likely affected by homdel, plot distribution of all its amplicons', default=False)
     parser.add_argument('--homdel_genes_oi', type = str, nargs='+', help = 'genes of interest for plotting homdel amplicon distributions', default = None)
     parser.add_argument('--cn_call_yaml', type=str, help='Required when plotting raw rc distribution. YAML file for this cn-call run', default=None)
