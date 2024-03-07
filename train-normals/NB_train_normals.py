@@ -1,3 +1,4 @@
+# %%
 import sys, argparse
 from pathlib import Path
 import yaml
@@ -8,7 +9,7 @@ import numpy as np
 from IPython import embed
 import pickle
 
-
+# %% Define functions
 def fit_NB_model(train_array, X, exposure, maxiter = 100):
     '''
     args:
@@ -69,17 +70,23 @@ def extract_NB_params(nb_res, amplicon_name, amplicon_rc, ):
 #     columns = ['amplicon', 'amplicon_factor', 'alpha', 'beta_zero', 'beta_one', 'method', 'mean', 'variance']
 #     )
 
-def main(args):
-    # ----- read in inputs -----
-    with open(args.run_config, 'rb') as f:
-        run_config = yaml.safe_load(f)
-    train_sample_rc_tsvs = OrderedDict(run_config['train_sample_rc_tsvs'])
-    output_dir = Path(run_config['output_dir'])
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True, exist_ok=True)
-    run_topic = run_config['run_topic']
-    amp_gene_map_f = Path(run_config['amp_gene_map_f'])
-    
+# %% Main
+# def main(args):
+# ----- read in inputs -----
+# with open(args.run_config, 'rb') as f:
+#     run_config = yaml.safe_load(f)
+run_config_f = "/juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/train-normals/NB_train_normals.config.yaml"
+with open(run_config_f, 'rb') as f:
+    run_config = yaml.safe_load(f)
+train_sample_rc_tsvs = OrderedDict(run_config['train_sample_rc_tsvs'])
+output_dir = Path(run_config['output_dir'])
+if not output_dir.exists():
+    output_dir.mkdir(parents=True, exist_ok=True)
+run_topic = run_config['run_topic']
+amp_gene_map_f = Path(run_config['amp_gene_map_f'])
+
+# if multiple samples are provided, combine them into one dataframe
+if len(train_sample_rc_tsvs) > 1:
     combined_df = pd.concat(
         [pd.read_csv(rc_i, sep='\t', index_col=0) for rc_i in train_sample_rc_tsvs.values()], 
         keys=[i for i in train_sample_rc_tsvs.keys()],
@@ -87,54 +94,60 @@ def main(args):
         )
     merged_index = [ f'{i}-{j}' for i, j in combined_df.index ]
     combined_df.index = merged_index
+else:
+    combined_df = pd.read_csv(list(train_sample_rc_tsvs.values())[0], sep='\t', index_col=0)
+    # combined_df.index = [ f'{i}-{j}' for i, j in combined_df.index ]
 
-    sc_total_rc = combined_df.sum(axis = 1)
-    # X = np.log(sc_total_rc).to_frame(name='total')
-    X = pd.DataFrame(
-        [1.0] * len(sc_total_rc), 
-        index = sc_total_rc.index, 
-        columns=['constant']
-        )
+sc_total_rc = combined_df.sum(axis = 1)
+# X = np.log(sc_total_rc).to_frame(name='total')
+X = pd.DataFrame(
+    [1.0] * len(sc_total_rc), 
+    index = sc_total_rc.index, 
+    columns=['constant']
+    )
 
-    # ----- fit NB model -----
-    nb_res_results = pd.Series(
-        [fit_NB_model(combined_df[amplicon_i], X, sc_total_rc) for amplicon_i in combined_df.columns],
-        index = combined_df.columns
-        ) # N x 1 array storing the training results of each amplicon
-    print('[SUCCESS] NB training finished successfully')
+# %% Fit model
+# ----- fit NB model -----
+nb_res_results = pd.Series(
+    [fit_NB_model(combined_df[amplicon_i], X, sc_total_rc) for amplicon_i in combined_df.columns],
+    index = combined_df.columns
+    ) # N x 1 array storing the training results of each amplicon
+print('[SUCCESS] NB training finished successfully')
 
-    # ----- pickle the NB results -----
-    output_f = Path(output_dir) / f'{run_topic}-results.pkl'
-    with open(output_f, 'wb') as output:
-        pickle.dump(nb_res_results, output)
-        print(f'[INFO] NB training results pickled to {output_f}')
-    
-    nb_res_results_df = pd.DataFrame(
-        index = nb_res_results.index,
-        columns = ['amplicon', 'converged', 'amplicon_factor', 'alpha', 'beta_zero', 'beta_one', 'method', 'mean', 'variance']
-        )
-    for amplicon_i in nb_res_results.index:
-        nb_res_results_df.loc[amplicon_i, :] = extract_NB_params(nb_res_results[amplicon_i], amplicon_i, combined_df[amplicon_i])
-        if nb_res_results_df.loc[amplicon_i, 'converged'] == False:
-            print('=' * 8)
-            print(f'[WARNING] {amplicon_i} did not converge')
+# %%
+# ----- pickle the NB results -----
+output_f = Path(output_dir) / f'{run_topic}-results.pkl'
+with open(output_f, 'wb') as output:
+    pickle.dump(nb_res_results, output)
+    print(f'[INFO] NB training results pickled to {output_f}')
 
-    ref_df = pd.read_csv(amp_gene_map_f, sep='\t')
-    ref_df.index = ref_df['amplicon_number']
-    nb_res_results_df['gene'] = ref_df[
-        nb_res_results_df['amplicon'],
-        'gene_name'
-    ] # get mapped gene names
-    nb_res_results_df.to_csv(Path(output_dir) / f'{run_topic}-results.csv', index=False, header=True)
-    
-    print('[INFO] NB training results saved to:', Path(output_dir) / f'{run_topic}-results.tsv')
-    # embed()
+nb_res_results_df = pd.DataFrame(
+    index = nb_res_results.index,
+    columns = ['amplicon', 'converged', 'amplicon_factor', 'alpha', 'beta_zero', 'beta_one', 'method', 'mean', 'variance']
+    )
+for amplicon_i in nb_res_results.index:
+    nb_res_results_df.loc[amplicon_i, :] = extract_NB_params(nb_res_results[amplicon_i], amplicon_i, combined_df[amplicon_i])
+    if nb_res_results_df.loc[amplicon_i, 'converged'] == False:
+        print('=' * 8)
+        print(f'[WARNING] {amplicon_i} did not converge')
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--run_config', type=str, help='input config yaml file')
-    # parser.add_argument('--output_dir', type=str, help='output directory')
+ref_df = pd.read_csv(amp_gene_map_f, sep='\t')
+ref_df.index = ref_df['amplicon_number']
+nb_res_results_df['gene'] = ref_df.loc[
+    nb_res_results_df['amplicon'],
+    'gene_name'
+] # get mapped gene names
+nb_res_results_df.to_csv(Path(output_dir) / f'{run_topic}-results.csv', index=False, header=True)
 
-    args = parser.parse_args(None if sys.argv[1:] else ['-h'])
+print('[INFO] NB training results saved to:', Path(output_dir) / f'{run_topic}-results.tsv')
+# embed()
 
-    main(args)
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('--run_config', type=str, help='input config yaml file')
+#     # parser.add_argument('--output_dir', type=str, help='output directory')
+
+#     args = parser.parse_args(None if sys.argv[1:] else ['-h'])
+
+#     main(args)
+# %%

@@ -1,5 +1,5 @@
 top_dir: /home/zhangh5/work/Tapestri_batch2/analysis/cn_clones
-cohort_name: RA16_08
+cohort_name: M04
 run_suffix: falcon_homdel_from_scratch_AJ # optional run specific suffix
 
 cn_calling_mode: cohort # cohort or single-sample
@@ -18,9 +18,9 @@ nclones:
     - 5
     - 6
     - 7
-    # - 8
-    # - 9
-    # - 10
+    - 8
+    - 9
+    - 10
 
 ######## ----- homodel-specific ----- ########
 start_from_best_sol: 'no' # 'yes' or 'no'
@@ -32,24 +32,19 @@ amplicon_gene_map_f: /home/zhangh5/work/Tapestri_project/cn-calling/reference/pa
 ##############################################
 
 samples:
-    - RA16_08-08_2
-    - RA16_08-08_7
-    - RA16_08-08_8
-    - RA16_08-10_3
-    - RA18_22-10_1
+    - M04-1
+    - M04-2
+    - M04-3
+    - RA18_18-11_1
 
 tsv_file_dict:
-    RA16_08-08_2: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA16_08/RA16_08-08_2/OUTPUTS_from_mpileup/RA16_08-08_2.per_amplicon_read_counts.tsv
-    RA16_08-08_7: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA16_08/RA16_08-08_7/OUTPUTS_from_mpileup/RA16_08-08_7.per_amplicon_read_counts.tsv
-    RA16_08-08_8: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA16_08/RA16_08-08_8/OUTPUTS_from_mpileup/RA16_08-08_8.per_amplicon_read_counts.tsv
-    RA16_08-10_3: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA16_08/RA16_08-10_3/OUTPUTS_from_mpileup/RA16_08-10_3.per_amplicon_read_counts.tsv
-    RA18_22-10_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_22-10_1/OUTPUTS_from_mpileup/RA18_22-10_1.per_amplicon_read_counts.tsv
+    M04-1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/M04/M04-1/OUTPUTS_from_mpileup/M04-1.per_amplicon_read_counts.tsv
+    M04-2: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/M04/M04-2/OUTPUTS_from_mpileup/M04-2.per_amplicon_read_counts.tsv
+    M04-3: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/M04/M04-3/OUTPUTS_from_mpileup/M04-3.per_amplicon_read_counts.tsv
+    RA18_18-11_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_18-11_1/OUTPUTS_from_mpileup/RA18_18-11_1.per_amplicon_read_counts.tsv
 
 # input_H5:
-#     RA16_08-08_2: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA16_08/RA16_08-08_2/OUTPUTS_from_mpileup/RA16_08-08_2.mpileup.h5
-#     RA16_08-08_7: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA16_08/RA16_08-08_7/OUTPUTS_from_mpileup/RA16_08-08_7.mpileup.h5
-#     RA16_08-08_8: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA16_08/RA16_08-08_8/OUTPUTS_from_mpileup/RA16_08-08_8.mpileup.h5
-#     RA16_08-10_3: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/RA16_08/RA16_08-10_3/OUTPUTS_from_mpileup/RA16_08-10_3.mpileup.h5
+#     RA18_18-11_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_18-11_1/OUTPUTS_from_mpileup/RA18_18-11_1.mpileup.h5
 
 scripts:
     cn_calling_panel_level_no_homdel: /home/zhangh5/work/Tapestri_project/cn-calling/scripts/mixed_NB_EM_panel_level_with_normal.py

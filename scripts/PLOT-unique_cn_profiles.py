@@ -16,7 +16,8 @@ import yaml, json
 
 from IPython import embed
 
-color_sequence = px.colors.qualitative.Set3
+color_sequence = px.colors.qualitative.Pastel
+# color_sequence = sns.cubehelix_palette(n_colors = len(cluster_labels)+1, start=.0, rot=2, light=0.8, dark=0.5, hue=3.5).as_hex()
 import seaborn as sns
 
 def main(args):
@@ -54,8 +55,11 @@ def main(args):
     sample_sc_clone_assignment_df = pd.read_csv(args.sample_sc_clone_assignment_csv, index_col=False, header=0)
 
     # @HZ 2023-10-04 temporary fix: rename `tree_renamed_clone_id` to `clone_id`
-    sample_sc_clone_assignment_df.rename(columns={'tree_renamed_clone_id': 'clone_id', 'sample_name': 'sample'}, inplace=True)
-    sample_sc_clone_assignment_df = sample_sc_clone_assignment_df[['sample', 'cell_barcode', 'clone_id']]
+    if "tree_renamed_clone_id" in sample_sc_clone_assignment_df.columns:
+        sample_sc_clone_assignment_df.rename(columns={'tree_renamed_clone_id': 'clone_id', 'sample_name': 'sample'}, inplace=True)
+        sample_sc_clone_assignment_df = sample_sc_clone_assignment_df[['sample', 'cell_barcode', 'clone_id']]
+    else:
+        sample_sc_clone_assignment_df.columns = ['sample', 'cell_barcode', 'clone_id']
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -182,7 +186,6 @@ def main(args):
         # sys.exit(0) #@HZ this seems to cause Snakemake to think there's an error
         return
     # embed()
-    color_sequence = sns.cubehelix_palette(n_colors = len(cluster_labels),start=.0, rot=2, light=0.8, dark=0.5, hue=3.5).as_hex()
     cn_clone_palette = dict(zip(cluster_labels, np.array(color_sequence)[cluster_labels]))
     cluster_colors = [cn_clone_palette[i] for i in cluster_labels]
 

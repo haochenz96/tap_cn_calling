@@ -1,29 +1,32 @@
 output_dir:
-    /home/zhangh5/work/Tapestri_project/cn-calling/train-normals/train-combined_8_normals
+    # /home/zhangh5/work/Tapestri_project/cn-calling/train-normals/train-combined_8_normals
+    /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/train-normals/v3_chem_RA18_18-11_1
 run_topic:
 # to be used for naming output files
-    NB_train-combined_8_normals
+    # NB_train-combined_8_normals
+    NB_train-v3_chem_RA18_18-11_1
 
 train_sample_rc_tsvs:
 # these rc-tsvs will be concatenated will used for training for per-amplicon NB model parameters
-    RA17_5-14_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_5-14_1/OUTPUTS_from_m2_f/RA17_5-14_1.per_amplicon_read_counts.tsv
-    RA17_37-39_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_37-39_1/OUTPUTS_from_m2_f/RA17_37-39_1.per_amplicon_read_counts.tsv
-    RA17_46-20_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_46-20_1/OUTPUTS_from_m2_f/RA17_46-20_1.per_amplicon_read_counts.tsv
-    RA18_10-30_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_10-30_1/OUTPUTS_from_m2_f/RA18_10-30_1.per_amplicon_read_counts.tsv
-    RA18_18-11_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_18-11_1/OUTPUTS_from_m2_f/RA18_18-11_1.per_amplicon_read_counts.tsv
-    RA18_22-10_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_22-10_1/OUTPUTS_from_m2_f/RA18_22-10_1.per_amplicon_read_counts.tsv
-    RA19_04-10_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA19_04-10_1/OUTPUTS_from_m2_f/RA19_04-10_1.per_amplicon_read_counts.tsv
-    RA19_06_36_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA19_06-36_1/OUTPUTS_from_m2_f/RA19_06-36_1.per_amplicon_read_counts.tsv
+    # RA17_5-14_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_5-14_1/OUTPUTS_from_m2_f/RA17_5-14_1.per_amplicon_read_counts.tsv
+    # RA17_37-39_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_37-39_1/OUTPUTS_from_m2_f/RA17_37-39_1.per_amplicon_read_counts.tsv
+    # RA17_46-20_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_46-20_1/OUTPUTS_from_m2_f/RA17_46-20_1.per_amplicon_read_counts.tsv
+    # RA18_10-30_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_10-30_1/OUTPUTS_from_m2_f/RA18_10-30_1.per_amplicon_read_counts.tsv
+    # RA18_18-11_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_18-11_1/OUTPUTS_from_m2_f/RA18_18-11_1.per_amplicon_read_counts.tsv
+    # RA18_22-10_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_22-10_1/OUTPUTS_from_m2_f/RA18_22-10_1.per_amplicon_read_counts.tsv
+    # RA19_04-10_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA19_04-10_1/OUTPUTS_from_m2_f/RA19_04-10_1.per_amplicon_read_counts.tsv
+    # RA19_06_36_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA19_06-36_1/OUTPUTS_from_m2_f/RA19_06-36_1.per_amplicon_read_counts.tsv
+    RA18_18-11_1: /juno/work/iacobuzc/haochen/Tapestri_batch3/pipeline_results_custom/normal_pancreas/RA18_18-11_1-v3_hg19-ucsc/results/tsv/RA18_18-11_1-v3_hg19-ucsc.cell.barcode.distribution.tsv
 
 amp_gene_map_f: /home/zhangh5/work/Tapestri_batch2/analysis/cn_clones/reference/panel3559_analysis.gene_cytoband.formatted.manual_adjusted.txt
 
 test_sample_rc_tsvs:
-    RA17_5-14_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_5-14_1/OUTPUTS_from_m2_f/RA17_5-14_1.per_amplicon_read_counts.tsv
-    RA17_37-39_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_37-39_1/OUTPUTS_from_m2_f/RA17_37-39_1.per_amplicon_read_counts.tsv
-    RA17_46-20_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_46-20_1/OUTPUTS_from_m2_f/RA17_46-20_1.per_amplicon_read_counts.tsv
-    RA18_10-30_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_10-30_1/OUTPUTS_from_m2_f/RA18_10-30_1.per_amplicon_read_counts.tsv
-    RA18_18-11_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_18-11_1/OUTPUTS_from_m2_f/RA18_18-11_1.per_amplicon_read_counts.tsv
-    RA18_22-10_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_22-10_1/OUTPUTS_from_m2_f/RA18_22-10_1.per_amplicon_read_counts.tsv
-    RA19_04-10_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA19_04-10_1/OUTPUTS_from_m2_f/RA19_04-10_1.per_amplicon_read_counts.tsv
-    RA19_06_36_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA19_06-36_1/OUTPUTS_from_m2_f/RA19_06-36_1.per_amplicon_read_counts.tsv
+    # RA17_5-14_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_5-14_1/OUTPUTS_from_m2_f/RA17_5-14_1.per_amplicon_read_counts.tsv
+    # RA17_37-39_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_37-39_1/OUTPUTS_from_m2_f/RA17_37-39_1.per_amplicon_read_counts.tsv
+    # RA17_46-20_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA17_46-20_1/OUTPUTS_from_m2_f/RA17_46-20_1.per_amplicon_read_counts.tsv
+    # RA18_10-30_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_10-30_1/OUTPUTS_from_m2_f/RA18_10-30_1.per_amplicon_read_counts.tsv
+    # RA18_18-11_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_18-11_1/OUTPUTS_from_m2_f/RA18_18-11_1.per_amplicon_read_counts.tsv
+    # RA18_22-10_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA18_22-10_1/OUTPUTS_from_m2_f/RA18_22-10_1.per_amplicon_read_counts.tsv
+    # RA19_04-10_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA19_04-10_1/OUTPUTS_from_m2_f/RA19_04-10_1.per_amplicon_read_counts.tsv
+    # RA19_06_36_1: /home/zhangh5/work/Tapestri_batch2/pipeline_results_custom/normal_pancreas/RA19_06-36_1/OUTPUTS_from_m2_f/RA19_06-36_1.per_amplicon_read_counts.tsv
     
