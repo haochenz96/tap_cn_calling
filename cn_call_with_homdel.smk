@@ -68,7 +68,7 @@ workdir: working_dir
 rule pass2_outputs_cohort:
     input:
         expand(
-            '{cohort_name}-cn_call_with_homdel/plots/{cohort_name}_homdel_nclones={nclones}.unique_cn_clone_profiles.csv',
+            '{cohort_name}-cn_call_with_homdel/cleaned_solutions/{cohort_name}_homdel_nclones={nclones}.unique_cn_clone_profiles.csv',
             cohort_name = cohort_names,
             nclones = nclones,
         ),
@@ -181,13 +181,13 @@ rule plot_cn_clone_profiles_compositions:
         solution_clone_profiles = '{cohort_name}-cn_call_with_homdel/solutions/{cohort_name}-homdel-nclones={nclones}_solution.amp_clone_profiles.csv',   
         solution_sc_assignments = '{cohort_name}-cn_call_with_homdel/solutions/{cohort_name}-homdel-nclones={nclones}_solution.cell_assignments.csv',     
     output:
-        # solution_clone_profiles_plot = '{cohort_name}-cn_call_with_homdel/plots/{cohort_name}_homdel_nclones={nclones}.cn_clone_profiles.png',
-        # result_clone_compo_plot = '{cohort_name}-cn_call_with_homdel/plots/{cohort_name}_homdel_nclones={nclones}.sample_CN-cluster_composition.png',
-        unique_clone_profiles_csv = '{cohort_name}-cn_call_with_homdel/plots/{cohort_name}_homdel_nclones={nclones}.unique_cn_clone_profiles.csv',
+        # solution_clone_profiles_plot = '{cohort_name}-cn_call_with_homdel/cleaned_solutions/{cohort_name}_homdel_nclones={nclones}.cn_clone_profiles.png',
+        # result_clone_compo_plot = '{cohort_name}-cn_call_with_homdel/cleaned_solutions/{cohort_name}_homdel_nclones={nclones}.sample_CN-cluster_composition.png',
+        unique_clone_profiles_csv = '{cohort_name}-cn_call_with_homdel/cleaned_solutions/{cohort_name}_homdel_nclones={nclones}.unique_cn_clone_profiles.csv',
     params:
         plot_cn_clone_profiles_script = config['scripts']['plot_cn_clone_profiles'],
         amp_gene_map_f = config['amplicon_gene_map_f'],
-        output_dir = f'{cohort_name}-cn_call_with_homdel/plots',
+        output_dir = f'{cohort_name}-cn_call_with_homdel/cleaned_solutions',
         output_f_prefix = lambda wildcards: f'_homdel_nclones={wildcards.nclones}',
         # common params
         cohort_name = cohort_name,
@@ -214,7 +214,7 @@ checkpoint select_optimal_nclones:
     input:
         # gather all nclones
         solution_EM_infos = expand('{{cohort_name}}-cn_call_with_homdel/solutions/{{cohort_name}}-homdel-nclones={nclones}_solution.EM_info.csv', nclones = config['nclones']),
-        solution_cell_assignments = expand('{{cohort_name}}-cn_call_with_homdel/solutions/{{cohort_name}}-homdel-nclones={nclones}_solution.cell_assignments.csv', nclones = config['nclones']),
+        cleaned_solution_cell_assignments = expand('{{cohort_name}}-cn_call_with_homdel/cleaned_solutions/{{cohort_name}}_homdel_nclones={nclones}.sample_sc_clone_assignment.updated.csv', nclones = config['nclones']),
     output:
         # # output directory
         # cn_call_no_homdel_output_dir = directory('cn_call_no_homdel/outputs'),
@@ -223,12 +223,14 @@ checkpoint select_optimal_nclones:
         interclone_distance_vs_nclones_lineplot = '{cohort_name}-cn_call_with_homdel/selected_solution/{cohort_name}_solution.avg_distance.png',
     params:
         cohort_name = cohort_name,
-        solutions_dir = '{cohort_name}-cn_call_with_homdel/solutions',
+        cleaned_solutions_dir = '{cohort_name}-cn_call_with_homdel/cleaned_solutions',
         output_dir = '{cohort_name}-cn_call_with_homdel/selected_solution',
         optimal_nclone_selection_script = config['scripts']['select_optimal_nclones'],
     log:
         std = '{cohort_name}-cn_call_with_homdel/std/EM_results_analysis-{cohort_name}.log',
         err = '{cohort_name}-cn_call_with_homdel/std/EM_results_analysis-{cohort_name}.err.log',
+    conda: 
+        "envs/mosaic-custom.yaml",
     threads: 4
     resources:
         mem_mb = lambda wildcards, attempt: attempt * 2000,
@@ -237,7 +239,7 @@ checkpoint select_optimal_nclones:
         """
         python {params.optimal_nclone_selection_script} \
             -d {cohort_name} \
-            -i {params.solutions_dir} \
+            -i {params.cleaned_solutions_dir} \
             --output_dir {params.output_dir} \
             1> {log.std} 2> {log.err}
         """
