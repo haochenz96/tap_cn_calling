@@ -60,6 +60,15 @@ else:
     print(f'[ERROR] cn_calling_mode can only be `single-sample` or `cohort`')
     sys.exit(1)
 
+# ----- sanity check input read count TSVs -----
+rc_dfs = []
+for cohort_i in cohort_names:
+    for sample_i in sample_map[cohort_i]:
+        rc_dfs.append(pd.read_csv(config['tsv_file_dict'][sample_i], sep="\t", index_col=0, header=0))
+
+# make sure the columns match for all samples
+assert all([rc_df.columns.tolist() == rc_dfs[0].columns.tolist() for rc_df in rc_dfs]), 'Read count TSV columns do not match for all samples'
+
 output_prefix = f'{cohort_name}-cohort-cn_calling-{run_suffix}'
 working_dir = top_dir / cohort_name / output_prefix
 print(f'[INFO] --- working directory ---- {working_dir}')
@@ -105,6 +114,8 @@ rule cn_calling_panel_level_with_homdel:
         maxcn = config['panel_maxcn'] if 'panel_maxcn' in config else 8, # default to 8
         init_maxcn = config['init_maxcn'] if 'init_maxcn' in config else 3, # default to 3
         min_num_amps_per_gene = config['min_num_amps_per_gene'] if 'min_num_amps_per_gene' in config else 1,
+        genes_of_interest = config['genes_of_interest'] if 'genes_of_interest' in config else [],
+        genes_to_exclude = config['genes_to_exclude'] if 'genes_to_exclude' in config else [],
     log:
         std = '{cohort_name}-cn_call_with_homdel/std/call/{cohort_name}-homdel-nclones={nclones}_seed={seed}.call.log',
         err = '{cohort_name}-cn_call_with_homdel/std/call/{cohort_name}-homdel-nclones={nclones}_seed={seed}.call.err.log',
@@ -131,6 +142,8 @@ rule cn_calling_panel_level_with_homdel:
             --seed {params.seed} \
             --prefix {params.output_prefix} \
             --min_num_amps_per_gene {params.min_num_amps_per_gene} \
+            --genes_of_interest {params.genes_of_interest} \
+            --genes_to_exclude {params.genes_to_exclude} \
             1> {log.std} 2> {log.err}        
         '''
         
@@ -183,6 +196,7 @@ rule plot_cn_clone_profiles_compositions:
     output:
         # solution_clone_profiles_plot = '{cohort_name}-cn_call_with_homdel/cleaned_solutions/{cohort_name}_homdel_nclones={nclones}.cn_clone_profiles.png',
         # result_clone_compo_plot = '{cohort_name}-cn_call_with_homdel/cleaned_solutions/{cohort_name}_homdel_nclones={nclones}.sample_CN-cluster_composition.png',
+        cleaned_solution_cell_assignments = '{cohort_name}-cn_call_with_homdel/cleaned_solutions/{cohort_name}_homdel_nclones={nclones}.sample_sc_clone_assignment.updated.csv',
         unique_clone_profiles_csv = '{cohort_name}-cn_call_with_homdel/cleaned_solutions/{cohort_name}_homdel_nclones={nclones}.unique_cn_clone_profiles.csv',
     params:
         plot_cn_clone_profiles_script = config['scripts']['plot_cn_clone_profiles'],
