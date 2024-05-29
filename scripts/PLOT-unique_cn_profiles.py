@@ -181,13 +181,18 @@ def main(args):
     # cluster_labels = np.arange(unique_cn_clone_profiles_df.shape[0])
     cluster_labels = unique_cn_clone_profiles_df.index.values
     logging.info(f"identified {len(cluster_labels)} unique clones")
-    if len(cluster_labels) == 1:
-        logging.warning(f"no tumor clone left after filtering, exiting...")
-        # sys.exit(0) #@HZ this seems to cause Snakemake to think there's an error
-        return
+    # @ HZ 2024-04-26 removed this
+    # if len(cluster_labels) == 1:
+    #     logging.warning(f"no tumor clone left after filtering, exiting...")
+    #     # sys.exit(0) #@HZ this seems to cause Snakemake to think there's an error
+    #     return
     # embed()
     cn_clone_palette = dict(zip(cluster_labels, np.array(color_sequence)[cluster_labels]))
     cluster_colors = [cn_clone_palette[i] for i in cluster_labels]
+    if len(cluster_labels) > len(color_sequence):
+        logging.warning(f"more clusters than colors, some clusters will be colored the same")
+    elif len(cluster_labels) == 1: # @HZ 2024-04-26: if only one clster, go.heatmap will return error
+        cluster_colors = None
 
     ###########  ----- CN cluster profiles -----  ################
     # draw subplots
@@ -199,7 +204,7 @@ def main(args):
         column_widths=[1 / 25, 24 / 25],
         row_heights=[1 / 25, 24 / 25],
         )
-
+    # embed()
     # get labels
     labs = go.Heatmap(
         z=cluster_labels,

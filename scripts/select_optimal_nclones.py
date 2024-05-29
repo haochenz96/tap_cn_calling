@@ -9,7 +9,7 @@ import itertools
 import plotly.express as px
 # import matplotlib.pyplot as plt
 from pathlib import Path
-# from IPython import embed
+from IPython import embed
 
 def average_distance(df_tapestri_clones, cn_assignment_df, amps_of_interest=None):
     if amps_of_interest is None:
@@ -38,12 +38,12 @@ def main(args):
         clones = [int(''.join(i)) for i in args.c]
     else:
         # need to parse out the nclone string from the file names
-        clones = [int(i.split('=')[1].split('_')[0]) for i in os.listdir(args.i) if i.endswith('.csv') and "solution.amp_clone_profiles.csv" in i]
+        clones = [int(i.split('=')[1].split('.')[0]) for i in os.listdir(args.i) if i.endswith('.csv') and "unique_cn_clone_profiles.csv" in i]
 
     if args.amplicon_gene_map is not None:
         amplicon_gene_map_df = pd.read_csv(args.amplicon_gene_map, index_col=0,)
         if not amplicon_gene_map_df.index[0].startswith('AMPL'):
-            embed()
+            # embed()
             raise ValueError("Amplicon gene map file is not formatted correctly")
         # use either gene or gene_name column
         found = False
@@ -64,25 +64,28 @@ def main(args):
     proper_clones = []
     for nclone in clones:
         # print(args.i, args.d)
-        df_tapestri_clones = pd.read_csv(Path(args.i) / f"{args.d}-homdel-nclones={nclone}_solution.amp_clone_profiles.csv", index_col = 0)
-        cn_assignment_df = pd.read_csv(Path(args.i) / f"{args.d}-homdel-nclones={nclone}_solution.cell_assignments.csv", index_col = 0)
+        df_tapestri_clones = pd.read_csv(Path(args.i) / f"{args.d}_homdel_nclones={nclone}.unique_cn_clone_profiles.csv", index_col = 0)
+        cn_assignment_df = pd.read_csv(Path(args.i) / f"{args.d}_homdel_nclones={nclone}.sample_sc_clone_assignment.updated.csv", index_col = 0)
         df_tapestri_clones = df_tapestri_clones.drop(df_tapestri_clones.columns[df_tapestri_clones.isin([-1]).any()], axis=1)
         threshold = 0.10 * df_tapestri_clones.shape[1]
         malignant_rows = ((df_tapestri_clones == 0.0).sum(axis=1) > threshold)
         
         proper_result = True
-        for mal_row in malignant_rows.index[malignant_rows]:
-            if len(cn_assignment_df[cn_assignment_df['clone_id'] == mal_row]) > 10:
-                proper_result = False
+        if args.no_solution_filter:
+            print("Not filtering solutions!")
+        else:
+            for mal_row in malignant_rows.index[malignant_rows]:
+                if len(cn_assignment_df[cn_assignment_df['clone_id'] == mal_row]) > 10:
+                    proper_result = False
 
         if proper_result:
             proper_clones.append(nclone)
             avg_val = average_distance(df_tapestri_clones, cn_assignment_df, amplicons_of_interest)
             avg_distance.append(avg_val)
         else:
-            print('Removed')
-            print(nclone)
-            print(malignant_rows)
+            print(f'Removed solution with {nclone} clones due to presence of at least one nontrivial clone with high number of amplicons called as homdel')
+            # print(nclone)
+            # print(malignant_rows)
 
     distances_df = pd.DataFrame({'nclone': proper_clones, 'avg_distance': avg_distance})
     distances_df['distance_from_prev_clone'] = distances_df['avg_distance'].diff()
@@ -94,12 +97,12 @@ def main(args):
     distances_df = distances_df.sort_values(by='nclone')
     fig = px.line(distances_df, x='nclone', y='avg_distance')
     fig.update_layout(
-        title=f"Distance from previous clone for {args.d}",
-        xaxis_title="nclone",
-        yaxis_title="Distance from previous clone",
+        title=f"Average inter-clone distances {args.d}",
+        xaxis_title="Nclone",
+        yaxis_title="Average inter-clone distance",
         font=dict(
             family="Courier New, monospace",
-            size=18,
+            size=12,
             color="#7f7f7f"
         )
     )
@@ -112,22 +115,25 @@ def main(args):
 
     # # @HZ: optimal nclone is the one with the largest distance from previous clone
     # opt_nclone = distances_df['nclone'].iloc[distances_df['distance_from_prev_clone'].idxmax()]
-
+    # embed()
     # @PS:
     # optimal nclone is the one with the largest between-clone average distance
-    opt_nclone = distances_df.iloc[distances_df['avg_distance'].idxmax()]['nclone'].astype(int)
+    opt_nclone = distances_df.loc[distances_df['avg_distance'].idxmax()]['nclone'].astype(int)
 
 
     print(f"[INFO] sample {args.d} -- opt_nclone: {opt_nclone}")
-    
-    cn_profile_fp = Path(args.i) / f"{args.d}-homdel-nclones={opt_nclone}_solution.amp_clone_profiles.csv"
-    clone_assignment_fp = Path(args.i) / f"{args.d}-homdel-nclones={opt_nclone}_solution.cell_assignments.csv"
+    # copy over
+    for fi in os.listdir(args.i):
+        if f"nclones={opt_nclone}" in fi:
+            shutil.copyfile(Path(args.i) / fi, Path(args.output_dir) / fi)
+    # cn_profile_fp = Path(args.i) / f"{args.d}_homdel_nclones={opt_nclone}.unique_cn_clone_profiles.csv"
+    # clone_assignment_fp = Path(args.i) / f"{args.d}_homdel_nclones={opt_nclone}.sample_sc_clone_assignment.updated.csv"
 
-    # shutil.copyfile(clone_assignment_fp, args.a) 
-    # shutil.copyfile(cn_profile_fp, args.p) 
+    # # shutil.copyfile(clone_assignment_fp, args.a) 
+    # # shutil.copyfile(cn_profile_fp, args.p) 
 
-    shutil.copyfile(cn_profile_fp, Path(args.output_dir) / f"{args.d}-homdel-nclones={opt_nclone}_solution.amp_clone_profiles.csv")
-    shutil.copyfile(clone_assignment_fp, Path(args.output_dir) / f"{args.d}-homdel-nclones={opt_nclone}_solution.cell_assignments.csv")
+    # shutil.copyfile(cn_profile_fp, Path(args.output_dir) / f"{args.d}_homdel_nclones={opt_nclone}.unique_cn_clone_profiles.csv")
+    # shutil.copyfile(clone_assignment_fp, Path(args.output_dir) / f"{args.d}_homdel_nclones={opt_nclone}.sample_sc_clone_assignment.updated.csv")
 
     return 0
 
@@ -141,6 +147,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str, help='output directory')
     # parser.add_argument('-a', type=str, help='output optimal clone assignment csv file')
     # parser.add_argument('-p', type=str, help='output optimal copy number profiles csv file')
-
+    # add option to turn off filtering of solutions with too many clones with high number of amplicons called as homdel
+    parser.add_argument('--no_solution_filter', action='store_true', help='do not filter out solutions with too many clones with high number of amplicons called as homdel')
     args = parser.parse_args(None if sys.argv[1:] else ['-h'])
     main(args)

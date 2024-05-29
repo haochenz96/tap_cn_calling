@@ -6,11 +6,11 @@ import sys
 from scipy.stats import nbinom
 from scipy.special import logsumexp
 
-# from IPython import embed
+from IPython import embed
 
 # @HZ: 01-23-2023:
 # PS homdel method
-zero_cn_mean = 0.2 # @HZ 06/13/2023 updated from 0.1 to 0.2
+zero_cn_mean = 0.2 # @HZ 06/13/2023 updated from 0.1 to 0.2. The higher it is, the more likely homdel will be called
 
 def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_amplicon_params, cell_total_reads, genelist, mixing_props, cn_profiles, homdel_profiles):
     '''
@@ -47,34 +47,6 @@ def get_responsibilities_and_marginal_panel_level(df_observed_read_counts, df_am
     namplicons = df_amplicon_params.shape[0] # M
     amplicon_list = list(df_amplicon_params.index)
     # print(f'DEBUG: length of amplicon_list {len(amplicon_list)}')
-    
-    # expanded_cn_profile = np.zeros((nclones, namplicons))
-    # for amplicon_idx, amplicon in enumerate(amplicon_list):
-    #     curr_gene = df_amplicon_params.loc[amplicon]['gene']
-    #     gene_idx = genelist.index(curr_gene)
-    #     expanded_cn_profile[:, amplicon_idx] = cn_profiles[:, gene_idx]    
-    #     for clone_idx in range(nclones):
-    #         if cn_profiles[clone_idx, gene_idx] == 0:
-    #             expanded_cn_profile[clone_idx, amplicon_idx] = zero_cn_mean
-    #         elif homdel_profiles[clone_idx, amplicon_idx] == 1:
-    #             expanded_cn_profile[clone_idx, amplicon_idx] = zero_cn_mean
-    #         else:
-    #             expanded_cn_profile[clone_idx, amplicon_idx] = cn_profiles[clone_idx, gene_idx]    
-    
-    # logcoeffs = np.zeros((ncells, nclones))
-    
-    # for clone_idx in range(nclones):
-    #     mu = expanded_cn_profile[clone_idx, :] * cell_total_reads.values[:, np.newaxis] * df_amplicon_params['amplicon_factor'].values[np.newaxis, :]
-    #     phi_matrix = np.array([1]*ncells)[:, np.newaxis] * df_amplicon_params['phi'].values[np.newaxis, :]
-
-    #     prob = phi_matrix / (phi_matrix + mu)
-    #     coeff_ij = nbinom.pmf(df_observed_read_counts.values, phi_matrix, prob)
-    #     coeff_ij = np.where(coeff_ij == 0, 1e-300, coeff_ij)
-        
-    #     logcoeffs[:, clone_idx] =  np.log(mixing_props[clone_idx]) + np.sum(np.log(coeff_ij), axis=1)
-
-    # marginal = np.sum(logsumexp(logcoeffs, axis=1))
-    # responsibilities = np.exp(logcoeffs - logsumexp(logcoeffs, axis=1)[:, np.newaxis])
 
     # @HZ: 03-20-2023:
     # ==================
@@ -303,9 +275,9 @@ def mixed_NB_EM_fixed_dispersion_panel_level(df_observed_read_counts, df_amplico
         
         # M-step
         new_mixing_props = responsibilities.sum(axis=0) / ncells
-        
+        # embed()
         new_cn_profiles, homdel_profiles = get_optimal_cn_profile(df_observed_read_counts, df_amplicons, cell_total_reads, genelist, responsibilities, cn_max)
-        
+        # embed()
         print('='*20)
         print(f'----- iter_count = {iter_count} updated cn_profiles -----')
         print(new_cn_profiles)
@@ -385,12 +357,18 @@ def main(args):
     df_amplicon_params['phi'] = 1 / df_amplicon_params['alpha']
     nclones = args.nclones
     
-    # @HZ 04/03/2023: add option to subset to genes of interest
+    # @HZ 2024-04-25: add option to select/exclude genes of interest
     if args.genes_of_interest is None:
         genes_of_interest = list(df_amplicon_params['gene'].unique())
+    elif len(args.genes_of_interest) == 0:
+        genes_of_interest = list(df_amplicon_params['gene'].unique())
     else:
+        print(f"[INFO] ----- Selecting genes: {args.genes_of_interest} -----")
         genes_of_interest = args.genes_of_interest
-
+    if args.genes_to_exclude is not None:
+        print(f"[INFO] ----- Excluding genes: {args.genes_to_exclude} -----")
+        genes_of_interest = list(set(genes_of_interest) - set(args.genes_to_exclude))
+        
     gene_vc = df_amplicon_params['gene'].value_counts()
     genes_with_min_namps = gene_vc[gene_vc >= args.min_num_amps_per_gene].index.tolist()
 
@@ -401,7 +379,7 @@ def main(args):
         df_amplicon_params['gene'].isin(filtered_genelist) & \
         (df_amplicon_params['converged'] == True) # filter out unconverged amplicons
     ]
-
+    # embed()
     df_amplicon_params = df_amplicon_params.loc[curr_selected_amplicons, :]
     print(f'''
     [INFO] After filtering for 
@@ -412,7 +390,7 @@ def main(args):
         ''')
 
     df_observed_read_counts = df_tsv[curr_selected_amplicons]
-    cell_total_read_counts = df_tsv.sum(axis = 1)
+    cell_total_read_counts = df_observed_read_counts.sum(axis = 1) # @HZ remember to subset to the selected amplicons
 
     # parse predefined cn profiles
     if args.start_from_best_sol == 'yes':
@@ -515,7 +493,8 @@ if __name__ == "__main__":
     parser.add_argument('--maxcn', type=int, help='maximum possible copy number', default=8)       
     parser.add_argument('--init_maxcn', type=int, help='limit the maximum possible copy number for the initial guess', default=3)
     # @HZ 04/03/2023: add option to specify genes to use
-    parser.add_argument('--genes_of_interest', nargs="*", help='genes to use', default=None)
+    parser.add_argument('--genes_of_interest', nargs="*", help='genes to select', default=None)
+    parser.add_argument('--genes_to_exclude', nargs="*", help='genes to exclude', default=None)
     parser.add_argument('--min_num_amps_per_gene', type=int, help='minimum number of amplicons per gene to use', default=1)
     parser.add_argument('--prefix', type=str, help='prefix for output files')
 
