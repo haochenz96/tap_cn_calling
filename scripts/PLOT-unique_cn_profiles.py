@@ -300,26 +300,24 @@ def main(args):
     colorbar_ticktext[-1] += '+'
     colorbar_tickvals = [(num_vals-1)/(num_vals*2) * (2*i + 1) - 1 for i in range(num_vals)] 
     fig.update_layout(
-            coloraxis=dict(
-                colorscale=colorscale,
-                colorbar_tickvals = colorbar_tickvals,
-                colorbar_ticktext = colorbar_ticktext,
-                colorbar_title=dict(
-                    font_size = 10,
-                    text = 'total_copy_number',
-                ),
-                cmax=num_vals-2,
-                cmin=-1
+        coloraxis=dict(
+            colorscale=colorscale,
+            colorbar_tickvals = colorbar_tickvals,
+            colorbar_ticktext = colorbar_ticktext,
+            colorbar_title=dict(
+                font_size = 10,
+                text = 'total_copy_number',
             ),
-            font_family = 'Arial'
-            )
-
-    fig.write_image(
-        output_dir / f'{cohort_name}{output_f_prefix}.cn_clone_profiles.png',
-        format='png',
+            cmax=num_vals-2,
+            cmin=-1
+        ),
+        font_family = 'Arial',
         width=1600,
         height=400,
-        scale = 3,
+    )
+
+    fig.write_image(
+        output_dir / f'{cohort_name}{output_f_prefix}.cn_clone_profiles.pdf'
     )
     logging.info(f"[SUCCESS] finished plotting unique CN clone profiles for {cohort_name}")
     ######################################################
@@ -348,9 +346,7 @@ def main(args):
     )
 
     fig.write_image(
-        output_dir / f'{cohort_name}{output_f_prefix}.sample_CN-cluster_composition.png',
-        format='png',
-        scale = 3,
+        output_dir / f'{cohort_name}{output_f_prefix}.sample_CN-cluster_composition.pdf',
     )
     logging.info(f"[SUCCESS] finished plotting cluster compositions of samples in cohort {cohort_name}")
 
