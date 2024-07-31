@@ -6,7 +6,7 @@ import sys
 from scipy.stats import nbinom
 from scipy.special import logsumexp
 
-from IPython import embed
+# from IPython import embed
 
 # @HZ: 01-23-2023:
 # PS homdel method

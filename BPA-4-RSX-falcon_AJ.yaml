@@ -1,0 +1,49 @@
+top_dir: /juno/work/iacobuzc/haochen/Tapestri_batch2/analysis/cn_clones
+cohort_name: BPA-4-RSX
+run_suffix: falcon_AJ # optional run specific suffix
+
+cn_calling_mode: cohort # cohort or single-sample
+panel_nseeds: 200
+panel_maxcn: 20
+init_maxcn: 4
+panel_amplicon_parameters: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/train-normals/train-combined_8_normals/NB_train-combined_8_normals-results.gene_added.csv
+# panel_amplicon_parameters: /juno/work/iacobuzc/haochen/analysis/cn_clones/reference/panel2_nb_results-TP53_fixed.csv
+add_all_or_best: best
+
+# Number of clones to try. These will be executed in parallel.
+nclones:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+
+######## ----- homodel-specific ----- ########
+start_from_best_sol: 'no' # 'yes' or 'no'
+# best_nclones: 
+#     - 4
+#     - 7 # <---- entered after inspecting `outputs/{cohort_name}_BIC_vs_nclones.png`
+amplicon_gene_map_f: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/reference/panel3559_analysis.gene_cytoband.formatted.manual_adjusted.txt
+
+##############################################
+
+samples:
+    - BPA-4-RSX
+    - RA18_18-11_1
+
+tsv_file_dict:
+    BPA-4-RSX: /juno/work/iacobuzc/haochen/Tapestri_batch2/pipeline_results_custom/BPA-4/BPA-4-RSX/OUTPUTS_from_mpileup/BPA-4-RSX.per_amplicon_read_counts.tsv
+    RA18_18-11_1: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/train-normals/train-combined_8_normals/RA18_18-11_1.per_amplicon_read_counts.tsv
+
+scripts:
+    cn_calling_panel_level_no_homdel: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/scripts/mixed_NB_EM_panel_level_with_normal.py
+    gather_NB_EM_results_no_homdel: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/scripts/gather_NB_EM_results.py 
+    cn_calling_panel_level_with_homdel: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/scripts/mixed_NB_EM_homdel_PS.py
+    gather_NB_EM_results_with_homdel: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/scripts/gather_NB_EM_results_homdel.py
+    plot_cn_clone_profiles: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/scripts/PLOT-unique_cn_profiles.py
+    add_ploidy_layers_to_h5: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/scripts/add_ploidy_layers_to_h5.py
+    select_optimal_nclones: /juno/work/iacobuzc/haochen/Tapestri_project/cn-calling/scripts/select_optimal_nclones.py

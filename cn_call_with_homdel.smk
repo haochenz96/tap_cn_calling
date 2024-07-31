@@ -210,7 +210,8 @@ rule plot_cn_clone_profiles_compositions:
         std = '{cohort_name}-cn_call_with_homdel/std/plot/{cohort_name}-homdel-nclones={nclones}.plot.log',
         err = '{cohort_name}-cn_call_with_homdel/std/plot/{cohort_name}-homdel-nclones={nclones}.plot.err.log',
     conda: 
-        "envs/mosaic-custom.yaml",
+        # "envs/mosaic-custom.yaml",
+        "mosaic-custom"
     shell:
         '''
         python {params.plot_cn_clone_profiles_script} \
@@ -244,7 +245,8 @@ checkpoint select_optimal_nclones:
         std = '{cohort_name}-cn_call_with_homdel/std/EM_results_analysis-{cohort_name}.log',
         err = '{cohort_name}-cn_call_with_homdel/std/EM_results_analysis-{cohort_name}.err.log',
     conda: 
-        "envs/mosaic-custom.yaml",
+        # "envs/mosaic-custom.yaml",
+        "mosaic-custom"
     threads: 4
     resources:
         mem_mb = lambda wildcards, attempt: attempt * 2000,
